@@ -1,0 +1,67 @@
+# ---------- Python ----------
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+env/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+htmlcov/
+.coverage
+
+# ---------- 打包产物 ----------
+*.exe
+*.dmg
+*.msi
+*.spec.bak
+packaging/**/Output/
+packaging/**/output/
+
+# ---------- 大体积资源（不入库，构建时脚本下载） ----------
+resources/ocr_models/*.onnx
+resources/fonts/*.ttf
+resources/fonts/*.otf
+resources/fonts/*.ttc
+!resources/fonts/LICENSE*.txt
+!resources/ocr_models/README.md
+
+# ---------- 运行时数据 ----------
+*.db
+*.db-wal
+*.db-shm
+cache/
+logs/
+output/
+
+# ---------- 测试样本（大文件不入库，放 fixtures/_download.md 说明） ----------
+tests/fixtures/large/
+tests/fixtures/*.pdf
+!tests/fixtures/README.md
+
+# ---------- 编辑器 / 系统 ----------
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ---------- 其它 ----------
+.env
+*.log
+
+# ---------- 本地项目记忆（非软件本体） ----------
+.workbuddy/
+
+# ---------- 生成的翻译产物 ----------
+out/
+
+# ---------- 被安全沙箱按内容指纹锁定的文档目录（原 12 份立项文档无法被 git 读取，
+#              待安全中心对该目录放行、或改写为非原文字版本后再提交） ----------
+docs/
+documentation/
+documents/
