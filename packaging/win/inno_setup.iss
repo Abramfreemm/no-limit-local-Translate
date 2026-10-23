@@ -9,6 +9,8 @@
 #define MyAppPublisher "LinguaForge"
 #define MyAppURL "https://github.com/<owner>/linguaforge"
 #define MyAppExeName "LinguaForge.exe"
+; 约定：PyInstaller 统一输出到 dist_v2（CI 与本地一致，见 .github/workflows/release.yml）。
+; 不用 dist/ 是因为 PyInstaller 重建时会先删旧目录，在受管控环境里会触发批量删除确认。
 #define MySourceDir "..\..\dist_v2\LinguaForge"
 
 [Setup]

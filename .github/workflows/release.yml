@@ -37,7 +37,7 @@ jobs:
         run: python scripts/prepare_resources.py
 
       - name: PyInstaller 打包
-        run: pyinstaller packaging/win/linguaforge.spec --noconfirm --clean
+        run: pyinstaller packaging/win/linguaforge.spec --noconfirm --distpath dist_v2 --workpath build_v2
 
       - name: 冒烟验证（exe 能起来、CLI 能响应）
         shell: pwsh
