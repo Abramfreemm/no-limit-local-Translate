@@ -57,19 +57,21 @@ jobs:
           $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
           & $iscc "packaging\win\inno_setup.iss"
 
-      - name: 计算校验值
-        shell: pwsh
+      - name: 收集产物并计算校验值
+        shell: bash
         run: |
-          Get-ChildItem -Recurse dist/*.exe | ForEach-Object {
-            (Get-FileHash $_.FullName -Algorithm SHA256).Hash + "  " + $_.Name
-          } | Out-File -Encoding utf8 dist/SHA256SUMS.txt
+          # 安装包由 iscc 输出到 packaging/win/Output（见 inno_setup.iss 的 OutputDir）
+          mkdir -p artifacts
+          cp packaging/win/Output/*.exe artifacts/
+          (cd artifacts && sha256sum *.exe > SHA256SUMS.txt)
+          cat artifacts/SHA256SUMS.txt
 
       - uses: actions/upload-artifact@v4
         with:
           name: LinguaForge-Windows
           path: |
-            dist/*.exe
-            dist/SHA256SUMS.txt
+            artifacts/*.exe
+            artifacts/SHA256SUMS.txt
 
   build-macos:
     name: macOS · dmg
