@@ -42,10 +42,13 @@ jobs:
         run: pyinstaller packaging/win/linguaforge.spec --noconfirm --distpath dist_v2 --workpath build_v2
 
       - name: 冒烟验证（exe 能起来、CLI 能响应）
-        shell: pwsh
+        shell: bash
         run: |
-          ./dist/LinguaForge/linguaforge-cli.exe --version
-          if ($LASTEXITCODE -ne 0) { throw "CLI 冒烟失败" }
+          # 注意：PyInstaller 输出目录是 dist_v2（见上面的 --distpath），别写回 dist
+          ./dist_v2/LinguaForge/linguaforge-cli.exe --version || exit 1
+          test -f ./dist_v2/LinguaForge/LinguaForge.exe || { echo "GUI 主程序缺失"; exit 1; }
+          test -d ./dist_v2/LinguaForge/_internal/resources/fonts || { echo "中文字体未打进包"; exit 1; }
+          echo "smoke ok"
 
       - name: Inno Setup 制作安装包
         shell: pwsh
