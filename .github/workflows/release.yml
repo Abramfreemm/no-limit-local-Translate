@@ -31,9 +31,11 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pyinstaller
+          pip install pyinstaller fonttools pip-licenses
 
       - name: 准备资源（字体 / OCR 模型）
+        env:
+          PYTHONIOENCODING: utf-8
         run: python scripts/prepare_resources.py
 
       - name: PyInstaller 打包
@@ -80,9 +82,11 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
-          pip install pyinstaller
+          pip install pyinstaller fonttools pip-licenses
 
       - name: 准备资源并生成 icns
+        env:
+          PYTHONIOENCODING: utf-8
         run: |
           python scripts/prepare_resources.py
           mkdir -p resources/icons/tmp.iconset

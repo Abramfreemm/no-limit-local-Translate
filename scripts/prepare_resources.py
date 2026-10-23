@@ -22,6 +22,14 @@ import sys
 import urllib.request
 from pathlib import Path
 
+# CI 上 Windows 控制台默认是 cp1252，打印中文会直接 UnicodeEncodeError 崩掉整个构建。
+# 这里统一把输出流改成 UTF-8，比依赖外部设 PYTHONIOENCODING 更可靠。
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:  # noqa: BLE001
+        pass
+
 ROOT = Path(__file__).resolve().parent.parent
 
 # 必须是 **glyf 轮廓的 TTF**：reportlab 的 TTFont 不支持 CFF（.otf），
