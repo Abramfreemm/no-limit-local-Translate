@@ -1,0 +1,7 @@
+1
+00:00:01,000 --> 00:00:04,000
+Welcome to the control cabinet guide.
+
+2
+00:00:05,000 --> 00:00:08,000
+Always disconnect the power supply first.

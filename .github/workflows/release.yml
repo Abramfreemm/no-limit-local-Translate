@@ -1,0 +1,148 @@
+name: Build & Release (Win exe + macOS dmg)
+
+# dmg 必须在 macOS 上构建，Windows 无法交叉产出可用的 arm64 .app，
+# 所以整条发布流水线放 GitHub Actions：win / mac 双 job 并行产出安装包。
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "版本号，如 0.1.0"
+        required: false
+        default: "0.1.0"
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    name: Windows · exe 安装包
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 安装依赖
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: 准备资源（字体 / OCR 模型）
+        run: python scripts/prepare_resources.py
+
+      - name: PyInstaller 打包
+        run: pyinstaller packaging/win/linguaforge.spec --noconfirm --clean
+
+      - name: 冒烟验证（exe 能起来、CLI 能响应）
+        shell: pwsh
+        run: |
+          ./dist/LinguaForge/linguaforge-cli.exe --version
+          if ($LASTEXITCODE -ne 0) { throw "CLI 冒烟失败" }
+
+      - name: Inno Setup 制作安装包
+        shell: pwsh
+        run: |
+          choco install innosetup --no-progress -y
+          $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          & $iscc "packaging\win\inno_setup.iss"
+
+      - name: 计算校验值
+        shell: pwsh
+        run: |
+          Get-ChildItem -Recurse dist/*.exe | ForEach-Object {
+            (Get-FileHash $_.FullName -Algorithm SHA256).Hash + "  " + $_.Name
+          } | Out-File -Encoding utf8 dist/SHA256SUMS.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LinguaForge-Windows
+          path: |
+            dist/*.exe
+            dist/SHA256SUMS.txt
+
+  build-macos:
+    name: macOS · dmg
+    runs-on: macos-14            # arm64；如需 x64 换成 macos-13
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 安装依赖
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      - name: 准备资源并生成 icns
+        run: |
+          python scripts/prepare_resources.py
+          mkdir -p resources/icons/tmp.iconset
+          sips -s format png resources/icons/app_512.png --out resources/icons/tmp.iconset/icon_512x512.png
+          cp resources/icons/app_512.png resources/icons/tmp.iconset/icon_256x256.png
+          iconutil -c icns resources/icons/tmp.iconset -o resources/icons/app.icns
+          rm -rf resources/icons/tmp.iconset
+
+      - name: PyInstaller 打包 .app
+        run: pyinstaller packaging/mac/linguaforge.spec --noconfirm --clean
+
+      - name: ad-hoc 签名（无 Apple 开发者账号时的兼容做法）
+        run: |
+          codesign --force --deep --sign - dist/LinguaForge.app || true
+          codesign --verify --deep --strict dist/LinguaForge.app || echo "::warning::ad-hoc 签名校验未通过（无开发者证书时正常）"
+
+      - name: 冒烟验证
+        run: |
+          dist/LinguaForge.app/Contents/MacOS/LinguaForge --help || true
+          test -d dist/LinguaForge.app && echo "app bundle OK"
+
+      - name: 制作 dmg
+        run: |
+          brew install create-dmg
+          create-dmg \
+            --volname "LinguaForge" \
+            --window-pos 200 120 \
+            --window-size 800 400 \
+            --icon-size 100 \
+            --icon "LinguaForge.app" 200 190 \
+            --app-drop-link 600 185 \
+            --no-internet-enable \
+            "dist/LinguaForge-macOS-arm64.dmg" \
+            "dist/LinguaForge.app"
+
+      - name: 计算校验值
+        run: shasum -a 256 dist/*.dmg > dist/SHA256SUMS.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LinguaForge-macOS
+          path: |
+            dist/*.dmg
+            dist/SHA256SUMS.txt
+
+  release:
+    name: 汇总发布
+    needs: [build-windows, build-macos]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: 合并校验值并生成 Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            artifacts/**/*.exe
+            artifacts/**/*.dmg
+            artifacts/**/SHA256SUMS.txt
+          generate_release_notes: true

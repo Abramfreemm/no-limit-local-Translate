@@ -65,3 +65,13 @@ out/
 docs/
 documentation/
 documents/
+
+# ---------- 另建输出目录（避免覆盖旧 dist 触发批量删除确认） ----------
+dist_release/
+build_release/
+
+# ---------- 体积大的二进制资源（由 scripts/prepare_resources.py 在构建时获取） ----------
+resources/fonts/*.ttf
+resources/fonts/*.otf
+resources/ocr_models/
+packaging/win/Output/

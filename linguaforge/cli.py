@@ -127,7 +127,23 @@ def cmd_translate(args: argparse.Namespace, cfg: Config) -> int:
             bar = f"{cur}/{total}" if total else str(cur)
             _print(f"  [{stage:<9}] {bar:<11} {msg}")
 
-    res = p.run(src, args.output, fmt=args.fmt, on_progress=on_progress)
+    page_range = None
+    if getattr(args, "pages", None):
+        try:
+            a, _, b = args.pages.partition("-")
+            page_range = (int(a), int(b) if b.strip() else int(a) + 1)
+        except ValueError:
+            _print(f"[warn] --pages 格式无法解析：{args.pages}（应为 0-10）")
+            page_range = None
+
+    res = p.run(
+        src,
+        args.output,
+        fmt=args.fmt,
+        on_progress=on_progress,
+        resume=not getattr(args, "no_resume", False),
+        page_range=page_range,
+    )
 
     if args.tm:
         p.translator.tm.save_json(args.tm)
@@ -151,9 +167,19 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("models", help="列出 Ollama 已装模型")
 
     t = sub.add_parser("translate", help="翻译文档")
-    t.add_argument("input", help="输入文件（PDF / TXT / MD）")
+    t.add_argument(
+        "input",
+        help="输入文件（PDF / DOCX / PPTX / XLSX / HTML / SRT / VTT / TXT / MD / 图片）",
+    )
     t.add_argument("-o", "--output", help="输出文件路径")
-    t.add_argument("--fmt", default="markdown", choices=["markdown", "txt"], help="输出格式")
+    t.add_argument(
+        "--fmt",
+        default="markdown",
+        choices=["markdown", "txt", "pdf", "docx", "pptx", "xlsx", "srt", "vtt"],
+        help="输出格式（pdf 仅支持 PDF 输入，走原位回填）",
+    )
+    t.add_argument("--pages", help="只翻指定页，如 0-10（0 起算，右不含）")
+    t.add_argument("--no-resume", action="store_true", help="忽略断点，从头重翻")
     t.add_argument("--src", default="auto", help="源语言（auto 为自动）")
     t.add_argument("--dst", default="zh-Hans", help="目标语言")
     t.add_argument("--model", help=f"覆盖默认模型")

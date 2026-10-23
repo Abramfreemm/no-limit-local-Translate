@@ -1,0 +1,75 @@
+LinguaForge（译匠）第三方许可清单
+========================================================================
+
+【一】随本软件分发的运行时依赖
+------------------------------------------------------------------------
+ Name                       Version     License
+ PySide6_Addons             6.12.0      LGPL-3.0-only OR GPL-2.0-only OR GPL-3.0-only                  
+ PySide6_Essentials         6.12.0      LGPL-3.0-only OR GPL-2.0-only OR GPL-3.0-only                  
+ PySide6_Pdf                6.12.0.140  LGPL-3.0-only OR GPL-2.0-only OR GPL-3.0-only                  
+ PySide6_WebEngine          6.12.0.140  LGPL-3.0-only OR GPL-2.0-only OR GPL-3.0-only                  
+ PyYAML                     6.0.3       MIT License                                                    
+ Pygments                   2.21.0      BSD-2-Clause                                                   
+ anyio                      4.15.1      MIT                                                            
+ beautifulsoup4             4.15.0      MIT License                                                    
+ certifi                    2026.10.19  Mozilla Public License 2.0 (MPL 2.0)                           
+ cffi                       2.1.1       MIT-0                                                          
+ charset-normalizer         3.5.2       MIT                                                            
+ colorama                   0.4.6       BSD License                                                    
+ cryptography               50.0.2      Apache-2.0 OR BSD-3-Clause                                     
+ et_xmlfile                 2.0.0       MIT License                                                    
+ flatbuffers                25.12.19    Apache Software License                                        
+ h11                        0.16.0      MIT License                                                    
+ httpcore                   1.0.9       BSD-3-Clause                                                   
+ httpx                      0.28.1      BSD License                                                    
+ idna                       3.20        BSD-3-Clause                                                   
+ iniconfig                  2.3.1       MIT                                                            
+ loguru                     0.7.3       MIT License                                                    
+ lxml                       6.1.3       BSD-3-Clause                                                   
+ numpy                      2.5.4       BSD-3-Clause AND 0BSD AND MIT AND Zlib AND CC0-1.0             
+ onnxruntime                1.31.0      MIT License                                                    
+ opencv-python              5.0.0.93    Apache Software License                                        
+ opencv-python-headless     5.0.0.93    Apache Software License                                        
+ openpyxl                   3.1.5       MIT License                                                    
+ packaging                  26.3        Apache-2.0 OR BSD-2-Clause                                     
+ pdfminer.six               20260107    MIT                                                            
+ pdfplumber                 0.11.10     MIT License                                                    
+ pillow                     13.0.0      MIT-CMU                                                        
+ platformdirs               4.13.5      MIT                                                            
+ pluggy                     1.7.0       MIT License                                                    
+ protobuf                   7.36.2      3-Clause BSD License                                           
+ psutil                     7.2.2       BSD-3-Clause                                                   
+ pyclipper                  1.4.0       MIT License                                                    
+ pycparser                  3.11        BSD-3-Clause                                                   
+ pypdf                      6.21.1      BSD-3-Clause                                                   
+ pypdfium2                  5.14.0      BSD-3-Clause, Apache-2.0, dependency licenses                  
+ python-docx                1.2.0       MIT License                                                    
+ python-pptx                1.0.2       MIT License                                                    
+ pywin32-ctypes             0.2.3       BSD-3-Clause                                                   
+ rapidocr-onnxruntime       1.2.3       Apache-2.0                                                     
+ reportlab                  5.0.1       BSD License                                                    
+ shapely                    2.2.0       BSD-3-Clause                                                   
+ shiboken6                  6.12.0      LGPL-3.0-only OR GPL-2.0-only OR GPL-3.0-only                  
+ six                        1.17.0      MIT License                                                    
+ soupsieve                  3.0.3       MIT                                                            
+ typing_extensions          4.16.0      PSF-2.0                                                        
+ win32_setctime             1.2.0       MIT License                                                    
+ xlsxwriter                 3.2.9       BSD License                                                    
+
+【二】仅用于构建本软件的工具（不随包分发）
+------------------------------------------------------------------------
+以下工具只存在于打包构建环境，不会安装到您的电脑上。
+其中 PyInstaller 为 GPLv2，但其许可证附带例外条款：用它打包的
+应用程序本身不被要求以 GPL 开源。此处列出仅为透明披露。
+
+ Name                       Version     License
+ altgraph                   0.17.5      MIT License                                                    
+ fonttools                  4.67.0      MIT                                                            
+ pefile                     2024.8.26   MIT                                                            
+ pyinstaller                6.22.3      GNU General Public License v2 (GPLv2)                          
+ pyinstaller-hooks-contrib  2026.9      Apache Software License; GNU General Public License v2 (GPLv2) 
+ pytest                     9.1.1       MIT                                                            
+ ruff                       0.17.1      MIT                                                            
+
+本软件自身采用 Apache-2.0 许可，详见随包的 LICENSE 文件。
+中文字体 Noto Sans SC 采用 SIL Open Font License 1.1，许可全文见 resources/fonts/OFL.txt。

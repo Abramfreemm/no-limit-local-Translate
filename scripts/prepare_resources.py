@@ -24,14 +24,20 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 
+# 必须是 **glyf 轮廓的 TTF**：reportlab 的 TTFont 不支持 CFF（.otf），
+# 拿 OTF 去注册会直接失败、导致回填出的 PDF 没有中文。
+# google/fonts 里的 NotoSansSC[wght].ttf 是可变 TTF，下面再实例化成静态字重。
 NOTO_SC_URL = (
-    "https://github.com/notofonts/noto-cjk/raw/main/Sans/SubsetOTF/SC/"
-    "NotoSansSC-Regular.otf"
+    "https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/notosanssc/"
+    "NotoSansSC%5Bwght%5D.ttf"
 )
-NOTO_LICENSE_URL = "https://raw.githubusercontent.com/notofonts/noto-cjk/main/LICENSE"
-
-# 国内镜像兜底（GitHub 可能不通）
-NOTO_SC_MIRROR = "https://mirrors.tuna.tsinghua.edu.cn/Adoptium/NotoSansSC-Regular.otf"
+NOTO_SC_URL_GITHUB = (
+    "https://github.com/google/fonts/raw/main/ofl/notosanssc/"
+    "NotoSansSC%5Bwght%5D.ttf"
+)
+NOTO_LICENSE_URL = (
+    "https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/notosanssc/OFL.txt"
+)
 
 
 def http_get(url: str, dest: Path, timeout: int = 60) -> bool:
@@ -45,26 +51,58 @@ def http_get(url: str, dest: Path, timeout: int = 60) -> bool:
         return False
 
 
+def instantiate_static(src: Path, out_dir: Path) -> int:
+    """把可变字体实例化成 Regular / Bold 两个静态 TTF。
+
+    为什么必须做这一步：reportlab 对**可变字体**做子集化时会丢 ToUnicode
+    映射，中文能画出来但 pdfplumber / 复制粘贴取不到文本（等于"看得见、
+    搜不到"）。实例化成静态字体后映射正常，所以这里不能省。
+    """
+    try:
+        from fontTools.ttLib import TTFont
+        from fontTools.varLib import instancer
+    except ImportError:
+        print("[字体] ⚠️ 未装 fontTools，跳过静态实例化（pip install fonttools）")
+        return 0
+    n = 0
+    for weight, name in ((400, "NotoSansSC-Regular.ttf"), (700, "NotoSansSC-Bold.ttf")):
+        dest = out_dir / name
+        if dest.exists():
+            n += 1
+            continue
+        try:
+            f = TTFont(str(src))
+            inst = instancer.instantiateVariableFont(
+                f, {"wght": weight}, inplace=False, updateFontNames=True
+            )
+            inst.save(str(dest))
+            n += 1
+            print(f"   实例化 {name} ({dest.stat().st_size/1e6:.1f} MB)")
+        except Exception as exc:  # noqa: BLE001
+            print(f"   [失败] {name}: {type(exc).__name__}: {exc}")
+    return n
+
+
 def prepare_fonts(out: Path, skip: bool) -> None:
     fonts = out / "fonts"
     fonts.mkdir(parents=True, exist_ok=True)
-    target = fonts / "NotoSansSC-Regular.otf"
+    variable = fonts / "NotoSansSC.ttf"
 
-    if target.exists():
-        print(f"[字体] 已存在，跳过：{target.name}")
-    elif skip:
-        print("[字体] 按参数跳过下载")
-        return
-    else:
-        print(f"[字体] 下载 Noto Sans SC …")
-        if not http_get(NOTO_SC_URL, target):
-            print("[字体] 主源失败，尝试镜像 …")
-            if not http_get(NOTO_SC_MIRROR, target):
+    if not variable.exists() and not skip:
+        print("[字体] 下载 Noto Sans SC（可变 TTF）…")
+        if not http_get(NOTO_SC_URL, variable):
+            print("[字体] 主源失败，尝试 GitHub 直连 …")
+            if not http_get(NOTO_SC_URL_GITHUB, variable):
                 print("[字体] ⚠️ 下载失败。构建可继续，但 CJK 输出需手动放入字体。")
                 return
-        print(f"   已保存 {target}  ({target.stat().st_size/1e6:.1f} MB)")
+        print(f"   已保存 {variable.name}  ({variable.stat().st_size/1e6:.1f} MB)")
+    elif skip:
+        print("[字体] 按参数跳过下载")
 
-    lic = fonts / "LICENSE_Noto_Sans_SC.txt"
+    if variable.exists():
+        instantiate_static(variable, fonts)
+
+    lic = fonts / "OFL.txt"
     if not lic.exists():
         print("[字体] 下载 OFL-1.1 许可声明（随包分发是强制要求）…")
         http_get(NOTO_LICENSE_URL, lic)
@@ -105,20 +143,80 @@ def prepare_ocr_models(out: Path) -> None:
     )
 
 
+# 只出现在构建环境、不会打进安装包的工具。
+# 其中 PyInstaller 是 GPLv2，但对它产出的程序有明确例外条款：
+# 使用它打包的应用程序不受 GPL 传染（见 PyInstaller  LICENSE 中的
+# "we will not ... claim that you ... must be licensed under the GPL"）。
+# 因此必须把它们与"随包分发的运行时依赖"分开列，避免用户误解。
+BUILD_ONLY = {
+    "pyinstaller",
+    "pyinstaller-hooks-contrib",
+    "altgraph",
+    "pefile",
+    "setuptools",
+    "pip",
+    "wheel",
+    "ruff",
+    "pytest",
+    "pytest-timeout",
+    "pip-licenses",
+    "fonttools",
+}
+
+
 def dump_licenses(out: Path) -> None:
-    """导出第三方许可清单（随安装包分发）。"""
+    """导出第三方许可清单（随安装包分发）。
+
+    分两段：
+      1) 运行时依赖 —— 真正打进安装包，用户机器上存在；
+      2) 构建期工具 —— 只在打包机器上有，GPL 工具在此列明但不随包分发。
+    """
     import subprocess
 
-    dest = out / "THIRD_PARTY_LICENSES.txt"
+    raw = out / "_licenses_raw.txt"
     try:
         subprocess.run(
-            [sys.executable, "-m", "piplicenses", "--format=plain", "--output-file", str(dest)],
+            [sys.executable, "-m", "piplicenses", "--format=plain", "--output-file", str(raw)],
             check=False,
             capture_output=True,
         )
     except Exception:  # noqa: BLE001
         pass
-    print(f"[许可] 第三方清单 → {dest if dest.exists() else '未生成（需 pip install pip-licenses）'}")
+    if not raw.exists():
+        print("[许可] 未生成（需 pip install pip-licenses）")
+        return
+
+    lines = raw.read_text(encoding="utf-8", errors="ignore").splitlines()
+    header, rest = (lines[0], lines[1:]) if lines else ("", [])
+    runtime, build = [], []
+    for ln in rest:
+        if not ln.strip():
+            continue
+        name = ln.split()[0].lower() if ln.split() else ""
+        (build if name in BUILD_ONLY else runtime).append(ln)
+
+    dest = out / "THIRD_PARTY_LICENSES.txt"
+    with open(dest, "w", encoding="utf-8") as fh:
+        fh.write("LinguaForge（译匠）第三方许可清单\n")
+        fh.write("=" * 72 + "\n\n")
+        fh.write("【一】随本软件分发的运行时依赖\n")
+        fh.write("-" * 72 + "\n")
+        fh.write(header.rstrip() + "\n")
+        fh.write("\n".join(runtime) + "\n\n")
+        fh.write("【二】仅用于构建本软件的工具（不随包分发）\n")
+        fh.write("-" * 72 + "\n")
+        fh.write(
+            "以下工具只存在于打包构建环境，不会安装到您的电脑上。\n"
+            "其中 PyInstaller 为 GPLv2，但其许可证附带例外条款：用它打包的\n"
+            "应用程序本身不被要求以 GPL 开源。此处列出仅为透明披露。\n\n"
+        )
+        fh.write(header.rstrip() + "\n")
+        fh.write("\n".join(build) + "\n\n")
+        fh.write("本软件自身采用 Apache-2.0 许可，详见随包的 LICENSE 文件。\n")
+        fh.write("中文字体 Noto Sans SC 采用 SIL Open Font License 1.1，"
+                 "许可全文见 resources/fonts/OFL.txt。\n")
+    raw.unlink(missing_ok=True)
+    print(f"[许可] 第三方清单 → {dest}（运行时 {len(runtime)} / 构建期 {len(build)}）")
 
 
 def main() -> int:
