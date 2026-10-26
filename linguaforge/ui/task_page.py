@@ -220,6 +220,8 @@ class TaskPage(QWidget):
             self._rows[row] = item
             self._insert_row(row, item)
             added += 1
+        if added:
+            self._on_fmt_changed(self.cmb_fmt.currentText())
         return added
 
     def _insert_row(self, row: int, item: _Row) -> None:
@@ -281,6 +283,7 @@ class TaskPage(QWidget):
             row = it.data(Qt.ItemDataRole.UserRole)
             self._rows.pop(row, None)
             self.table.removeRow(model_idx)
+        self._on_fmt_changed(self.cmb_fmt.currentText())
 
     def _on_clear(self) -> None:
         if not self._rows:
@@ -294,6 +297,7 @@ class TaskPage(QWidget):
             return
         self.table.setRowCount(0)
         self._rows.clear()
+        self._on_fmt_changed(self.cmb_fmt.currentText())
 
     def _on_browse(self) -> None:
         d = QFileDialog.getExistingDirectory(self, tr("task.browse", self.lang_code), "")
@@ -332,10 +336,21 @@ class TaskPage(QWidget):
         dlg.exec()
 
     def _on_fmt_changed(self, text: str) -> None:
-        self.lbl_fmt_warn.setVisible(text not in KERNEL_OUTPUT_FMTS)
-        self.lbl_fmt_warn.setText(
-            tr("task.fmt_warn", self.lang_code) if text not in KERNEL_OUTPUT_FMTS else ""
-        )
+        """只在真正会发生降级时提示。
+
+        内核已支持全部 7 种输出格式；唯一会降级的情况是
+        「输出选了 PDF，但输入不是 PDF」——PDF 输出走原位回填，必须以 PDF 为底稿。
+        """
+        warn = ""
+        if text == "pdf":
+            non_pdf = [it for it in self._rows.values()
+                       if it.path.suffix.lower() != ".pdf"]
+            if non_pdf:
+                warn = tr("task.fmt_warn_pdf", self.lang_code)
+        elif text not in KERNEL_OUTPUT_FMTS:
+            warn = tr("task.fmt_unknown", self.lang_code)
+        self.lbl_fmt_warn.setText(warn)
+        self.lbl_fmt_warn.setVisible(bool(warn))
 
     # ---------------------------------------------------------------- 运行
     def _on_start(self) -> None:

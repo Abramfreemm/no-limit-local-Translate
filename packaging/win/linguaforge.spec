@@ -22,6 +22,12 @@ for rel in ("resources/fonts", "resources/icons", "resources/i18n", "resources/o
     if p.exists():
         datas.append((str(p), rel))
 
+# 第三方许可清单在 resources/ 根目录下，不在上面任一子目录内，必须显式收集；
+# 否则安装包里只有 fonts/icons/ocr_models，缺随附的开源许可文件（OFL 随 fonts 目录进包）。
+_licenses = ROOT / "resources" / "THIRD_PARTY_LICENSES.txt"
+if _licenses.exists():
+    datas.append((str(_licenses), "resources"))
+
 binaries = []
 hiddenimports = [
     # PDF 内核

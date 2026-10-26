@@ -21,7 +21,7 @@ import httpx
 from PySide6.QtCore import QThread, Signal
 
 from ..core.config import Config
-from ..pipeline import Pipeline, PipelineResult
+from ..pipeline import OUT_EXT, SUPPORTED_IN, Pipeline, PipelineResult
 from ..translate.ollama_client import OllamaClient
 
 # ---------------------------------------------------------------- 格式常量
@@ -36,11 +36,12 @@ INPUT_EXTS: tuple[str, ...] = (
 #: 输出格式（传给 Pipeline.run 的 fmt 字符串）
 OUTPUT_FORMATS: tuple[str, ...] = ("markdown", "text", "pdf", "docx", "pptx", "xlsx", "srt")
 
-#: 当前内核真正实现的输入扩展名（pipeline.run 里挂了 parser 的）
-KERNEL_INPUT_EXTS: frozenset = frozenset({".pdf", ".txt", ".md", ".markdown"})
+#: 内核能力清单一律从 pipeline 派生，避免 UI 与内核再度漂移
+#: （M2/M4 之后内核已支持 PDF/Office/HTML/字幕/图片输入与 7 种输出）
+KERNEL_INPUT_EXTS: frozenset = frozenset(SUPPORTED_IN)
 
-#: 当前内核真正实现的输出格式（其余会降级为纯文本写出）
-KERNEL_OUTPUT_FMTS: frozenset = frozenset({"markdown", "text"})
+#: 当前内核真正实现的输出格式（pipeline.OUT_EXT 的键，含 txt 别名）
+KERNEL_OUTPUT_FMTS: frozenset = frozenset(OUT_EXT)
 
 #: 输出格式 -> 文件后缀
 OUT_SUFFIX: dict[str, str] = {

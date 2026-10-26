@@ -21,6 +21,10 @@ for rel in ("resources/fonts", "resources/icons", "resources/i18n", "resources/o
     if p.exists():
         datas.append((str(p), rel))
 
+_licenses = ROOT / "resources" / "THIRD_PARTY_LICENSES.txt"
+if _licenses.exists():
+    datas.append((str(_licenses), "resources"))
+
 binaries = []
 hiddenimports = [
     "pypdfium2", "pdfplumber", "pypdf", "reportlab",

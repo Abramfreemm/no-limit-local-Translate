@@ -40,7 +40,8 @@ _ZH: dict[str, str] = {
     "task.outdir": "输出目录（留空 = 与源文件同目录）",
     "task.browse": "选择…",
     "task.drop": "把文件拖到这里（PDF / Office / 文本 / 图片）",
-    "task.fmt_warn": "注意：当前内核仅实现 markdown / text 写出，其它格式会降级为纯文本。",
+    "task.fmt_warn_pdf": "PDF 输出走原位回填，仅支持 PDF 原文；队列中的非 PDF 文件会自动改用 Markdown 输出。",
+    "task.fmt_unknown": "未知的输出格式，将按 Markdown 处理。",
     "task.unsupported": "内核暂不支持（等待解析器接入）",
     "task.hint_unsupported": "已加入队列，但内核尚无该格式的解析器：{ext}",
     "task.no_selection": "请先选择一个已完成的任务行。",
@@ -177,8 +178,9 @@ _EN: dict[str, str] = {
     "task.outdir": "Output folder (empty = same as source)",
     "task.browse": "Browse…",
     "task.drop": "Drop files here (PDF / Office / text / image)",
-    "task.fmt_warn": "Note: the kernel currently implements markdown / text writers only; "
-                     "other formats fall back to plain text.",
+    "task.fmt_warn_pdf": "PDF output rewrites the source in place and only accepts PDF input; "
+                         "non-PDF files in the queue fall back to Markdown.",
+    "task.fmt_unknown": "Unknown output format; falling back to Markdown.",
     "task.unsupported": "Not supported by kernel yet",
     "task.hint_unsupported": "Queued, but the kernel has no parser for this format yet: {ext}",
     "task.no_selection": "Please select a finished row first.",
