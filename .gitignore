@@ -28,6 +28,7 @@ resources/fonts/*.ttf
 resources/fonts/*.otf
 resources/fonts/*.ttc
 !resources/fonts/LICENSE*.txt
+!resources/fonts/OFL.txt
 !resources/ocr_models/README.md
 
 # ---------- 运行时数据 ----------
@@ -69,6 +70,8 @@ documents/
 # ---------- 另建输出目录（避免覆盖旧 dist 触发批量删除确认） ----------
 dist_release/
 build_release/
+dist_v2/
+build_v2/
 
 # ---------- 体积大的二进制资源（由 scripts/prepare_resources.py 在构建时获取） ----------
 resources/fonts/*.ttf
