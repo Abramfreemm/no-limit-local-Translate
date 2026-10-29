@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import sqlite3
 from pathlib import Path
-from typing import Optional
 
 SCHEMA_VERSION = 1
 
@@ -163,7 +162,7 @@ def vacuum(conn: sqlite3.Connection) -> None:
     conn.execute("VACUUM")
 
 
-def resolve_db_path(custom: Optional[str | Path] = None) -> Path:
+def resolve_db_path(custom: str | Path | None = None) -> Path:
     """数据库默认落在用户数据目录，打包后不可写安装目录。"""
     if custom:
         return Path(custom)

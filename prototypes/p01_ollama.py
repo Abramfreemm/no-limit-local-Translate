@@ -186,7 +186,7 @@ def main() -> int:
         result = parse_translations(raw2, len(samples))
 
     print("\n[解析结果]")
-    for i, (src, dst) in enumerate(zip(samples, result), 1):
+    for i, (src, dst) in enumerate(zip(samples, result, strict=False), 1):
         flag = "OK " if dst else "MISS"
         print(f"  {flag} [{i}] {src}")
         print(f"        → {dst}")

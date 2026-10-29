@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 from platformdirs import user_data_dir
 
@@ -44,14 +44,14 @@ class OCRConfig:
     """OCR 配置。"""
 
     enabled: bool = True
-    engine: str = "rapidocr"          # rapidocr | paddleocr | vlm
+    engine: str = "rapidocr"  # rapidocr | paddleocr | vlm
     # 文本层字符数低于此阈值判定为扫描页，触发 OCR
     min_text_chars: int = 60
     dpi: int = 200
     max_dpi: int = 300
     lang: str = "ch"
-    min_confidence: float = 0.45      # 低于此置信度的 OCR 结果丢弃
-    vlm_model: str = ""               # 可选：Ollama 视觉模型名
+    min_confidence: float = 0.45  # 低于此置信度的 OCR 结果丢弃
+    vlm_model: str = ""  # 可选：Ollama 视觉模型名
 
 
 @dataclass
@@ -69,15 +69,15 @@ class TMConfig:
     """翻译记忆。"""
 
     enabled: bool = True
-    min_match_ratio: float = 0.92     # 模糊匹配阈值
+    min_match_ratio: float = 0.92  # 模糊匹配阈值
 
 
 @dataclass
 class OutputConfig:
     """输出配置。"""
 
-    fmt: str = "markdown"             # markdown | txt | bilingual
-    bilingual: bool = False           # 双语对照
+    fmt: str = "markdown"  # markdown | txt | bilingual
+    bilingual: bool = False  # 双语对照
     keep_numbering: bool = True
     ocr_text_to_markdown: bool = True
 
@@ -112,11 +112,11 @@ class Config:
     ui_lang: str = "zh-CN"
 
     # ---- 持久化 ----
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, d: Dict[str, Any]) -> "Config":
+    def from_dict(cls, d: dict[str, Any]) -> Config:
         c = cls()
         for key in ("lang_src", "lang_dst", "ui_lang"):
             if key in d:
@@ -135,14 +135,14 @@ class Config:
             c.perf = _merge(c.perf, PerfConfig, d["perf"])
         return c
 
-    def save(self, path: Optional[Path] = None) -> Path:
+    def save(self, path: Path | None = None) -> Path:
         p = Path(path) if path else default_data_dir() / "config.json"
         p.parent.mkdir(parents=True, exist_ok=True)
         p.write_text(json.dumps(self.to_dict(), ensure_ascii=False, indent=2), encoding="utf-8")
         return p
 
     @classmethod
-    def load(cls, path: Optional[Path] = None) -> "Config":
+    def load(cls, path: Path | None = None) -> Config:
         p = Path(path) if path else default_data_dir() / "config.json"
         if not p.exists():
             return cls()
@@ -152,14 +152,14 @@ class Config:
             return cls()
 
 
-def _merge(obj: Any, cls_: type, d: Dict[str, Any]) -> Any:
+def _merge(obj: Any, cls_: type, d: dict[str, Any]) -> Any:
     """用字典更新 dataclass，忽略未知键。"""
     known = {k: v for k, v in d.items() if k in cls_.__dataclass_fields__}
     return cls_(**{**asdict(obj), **known})
 
 
 # ---- 语言名称表（供 prompt 使用）----
-LANG_NAMES: Dict[str, str] = {
+LANG_NAMES: dict[str, str] = {
     "auto": "the source language (auto-detect)",
     "zh-Hans": "Simplified Chinese",
     "zh-Hant": "Traditional Chinese",

@@ -9,7 +9,7 @@
 from __future__ import annotations
 
 import re
-from typing import List, Sequence
+from collections.abc import Sequence
 
 from .docir import Block
 
@@ -20,7 +20,7 @@ _RE_SENT_SPLIT = re.compile(
 _RE_LONG_BREAK = re.compile(r"[;；,，]\s+")
 
 
-def split_sentences(text: str, max_chars: int) -> List[str]:
+def split_sentences(text: str, max_chars: int) -> list[str]:
     """把超长文本切成 <= max_chars 的若干片段，尽量在句边界。"""
     text = text.strip()
     if len(text) <= max_chars:
@@ -28,7 +28,7 @@ def split_sentences(text: str, max_chars: int) -> List[str]:
     parts = [p.strip() for p in _RE_SENT_SPLIT.split(text) if p and p.strip()]
     if not parts:
         parts = [text]
-    out: List[str] = []
+    out: list[str] = []
     buf = ""
     for p in parts:
         while len(p) > max_chars:
@@ -63,19 +63,21 @@ def split_sentences(text: str, max_chars: int) -> List[str]:
 class Chunker:
     """贪心装填批次。"""
 
-    def __init__(self, max_chars: int = 1200, max_items: int = 12, hard_max_chars: int = 4000) -> None:
+    def __init__(
+        self, max_chars: int = 1200, max_items: int = 12, hard_max_chars: int = 4000
+    ) -> None:
         self.max_chars = max_chars
         self.max_items = max_items
         self.hard_max_chars = hard_max_chars
 
-    def chunk(self, blocks: Sequence[Block]) -> List[List[Block]]:
+    def chunk(self, blocks: Sequence[Block]) -> list[list[Block]]:
         """输入块列表，输出批次的批次。
 
         说明：返回的 Block 可能是为超长文本生成的“子块副本”，
         其 meta["parent_id"] 指向原块，翻译完成后由 Translator 回写合并。
         """
-        batches: List[List[Block]] = []
-        cur: List[Block] = []
+        batches: list[list[Block]] = []
+        cur: list[Block] = []
         cur_chars = 0
 
         def flush() -> None:
@@ -92,7 +94,7 @@ class Chunker:
             if len(text) > self.hard_max_chars:
                 flush()
                 subs = split_sentences(text, self.max_chars)
-                sub_blocks: List[Block] = []
+                sub_blocks: list[Block] = []
                 for i, s in enumerate(subs):
                     sb = Block(
                         id=f"{b.id}#{i}",

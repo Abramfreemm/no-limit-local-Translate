@@ -25,53 +25,70 @@ OUT_DIR.mkdir(parents=True, exist_ok=True)
 # ---------------------------------------------------------------- 1. 生成样本 PDF
 def make_pdf(path: Path) -> Path:
     from reportlab.lib.pagesizes import A4
-    from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+    from reportlab.lib.styles import getSampleStyleSheet
     from reportlab.lib.units import mm
     from reportlab.platypus import PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table
 
     styles = getSampleStyleSheet()
     doc = SimpleDocTemplate(
-        str(path), pagesize=A4,
-        leftMargin=20 * mm, rightMargin=20 * mm,
-        topMargin=20 * mm, bottomMargin=20 * mm,
+        str(path),
+        pagesize=A4,
+        leftMargin=20 * mm,
+        rightMargin=20 * mm,
+        topMargin=20 * mm,
+        bottomMargin=20 * mm,
         title="LinguaForge Prototype Sample",
     )
     story = []
-    story.append(Paragraph("Thermal Performance of the XJ-2000 Control Cabinet",
-                           styles["Title"]))
+    story.append(Paragraph("Thermal Performance of the XJ-2000 Control Cabinet", styles["Title"]))
     story.append(Spacer(1, 6 * mm))
-    story.append(Paragraph(
-        "Abstract. This document describes the measurement procedure for the thermal "
-        "efficiency of the XJ-2000 control cabinet under full load conditions. The "
-        "ambient temperature shall be recorded before each measurement.",
-        styles["BodyText"]))
+    story.append(
+        Paragraph(
+            "Abstract. This document describes the measurement procedure for the thermal "
+            "efficiency of the XJ-2000 control cabinet under full load conditions. The "
+            "ambient temperature shall be recorded before each measurement.",
+            styles["BodyText"],
+        )
+    )
     story.append(Spacer(1, 4 * mm))
     story.append(Paragraph("1. Measurement Setup", styles["Heading2"]))
-    story.append(Paragraph(
-        "Connect the cabinet to the rated power supply and allow it to stabilise for "
-        "30 minutes. Do not open the enclosure while the device is energised.",
-        styles["BodyText"]))
+    story.append(
+        Paragraph(
+            "Connect the cabinet to the rated power supply and allow it to stabilise for "
+            "30 minutes. Do not open the enclosure while the device is energised.",
+            styles["BodyText"],
+        )
+    )
     story.append(Spacer(1, 4 * mm))
-    data = [["Parameter", "Value", "Unit"],
-            ["Thermal efficiency", "42.7", "%"],
-            ["Ambient temperature", "25.0", "°C"],
-            ["Rated power", "3.2", "kW"]]
+    data = [
+        ["Parameter", "Value", "Unit"],
+        ["Thermal efficiency", "42.7", "%"],
+        ["Ambient temperature", "25.0", "°C"],
+        ["Rated power", "3.2", "kW"],
+    ]
     tbl = Table(data, colWidths=[60 * mm, 40 * mm, 30 * mm])
-    tbl.setStyle([("GRID", (0, 0), (-1, -1), 0.5, "black"),
-                  ("BACKGROUND", (0, 0), (-1, 0), "#dddddd")])
+    tbl.setStyle(
+        [("GRID", (0, 0), (-1, -1), 0.5, "black"), ("BACKGROUND", (0, 0), (-1, 0), "#dddddd")]
+    )
     story.append(tbl)
     story.append(PageBreak())
     story.append(Paragraph("2. Results and Discussion", styles["Heading2"]))
-    story.append(Paragraph(
-        "The measured values are consistent with the design specification. A deviation "
-        "of less than 1.5% was observed across three repeated trials.",
-        styles["BodyText"]))
+    story.append(
+        Paragraph(
+            "The measured values are consistent with the design specification. A deviation "
+            "of less than 1.5% was observed across three repeated trials.",
+            styles["BodyText"],
+        )
+    )
     story.append(PageBreak())
     story.append(Paragraph("3. Maintenance Notes", styles["Heading2"]))
-    story.append(Paragraph(
-        "Turn off the main switch and wait 60 seconds before any maintenance. Record "
-        "the serial number and the date of service in the log book.",
-        styles["BodyText"]))
+    story.append(
+        Paragraph(
+            "Turn off the main switch and wait 60 seconds before any maintenance. Record "
+            "the serial number and the date of service in the log book.",
+            styles["BodyText"],
+        )
+    )
     doc.build(story)
     return path
 
@@ -88,17 +105,20 @@ def extract_with_pdfplumber(pdf: Path) -> dict:
             stats["chars"] += len(chars)
             stats["words"] += len(page.extract_words())
             for c in chars:
-                stats["sizes"][round(c.get("size", 0), 1)] = \
+                stats["sizes"][round(c.get("size", 0), 1)] = (
                     stats["sizes"].get(round(c.get("size", 0), 1), 0) + 1
+                )
                 fn = c.get("fontname", "?")
                 stats["fonts"][fn] = stats["fonts"].get(fn, 0) + 1
             if pno == 1:
                 # 打印第 1 页前若干词的坐标，验证"字符级 bbox"可用
                 print("\n[第1页 前 8 个词：文本 / bbox / 字号 / 字体]")
                 for w in page.extract_words()[:8]:
-                    print(f"   {w['text'][:26]:<26} "
-                          f"({w['x0']:6.1f},{w['top']:6.1f},{w['x1']:6.1f},{w['bottom']:6.1f})  "
-                          f"upright={w.get('upright')}  {w.get('fontname','')[:22]}")
+                    print(
+                        f"   {w['text'][:26]:<26} "
+                        f"({w['x0']:6.1f},{w['top']:6.1f},{w['x1']:6.1f},{w['bottom']:6.1f})  "
+                        f"upright={w.get('upright')}  {w.get('fontname', '')[:22]}"
+                    )
     return stats
 
 
@@ -159,7 +179,7 @@ def main() -> int:
     print("=" * 68)
 
     pdf = make_pdf(OUT_DIR / "sample.pdf")
-    print(f"[1] reportlab 生成样本 PDF: {pdf}  ({pdf.stat().st_size/1024:.1f} KB)")
+    print(f"[1] reportlab 生成样本 PDF: {pdf}  ({pdf.stat().st_size / 1024:.1f} KB)")
 
     print("\n[2] pdfplumber 提取文本与坐标 …")
     stats = extract_with_pdfplumber(pdf)

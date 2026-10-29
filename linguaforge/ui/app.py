@@ -52,9 +52,7 @@ def setup_logging() -> Path:
             log_path, maxBytes=2 * 1024 * 1024, backupCount=3, encoding="utf-8"
         )
         handler.setFormatter(
-            logging.Formatter(
-                "%(asctime)s [%(levelname)s] %(threadName)s %(name)s: %(message)s"
-            )
+            logging.Formatter("%(asctime)s [%(levelname)s] %(threadName)s %(name)s: %(message)s")
         )
         root.addHandler(handler)
     return log_path

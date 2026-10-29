@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import httpx
 
@@ -32,7 +32,7 @@ class OllamaClient:
         except Exception as e:  # noqa: BLE001
             raise OllamaUnavailable(f"无法连接 Ollama（{self.host}）：{e}") from e
 
-    def list_models(self) -> List[str]:
+    def list_models(self) -> list[str]:
         try:
             r = self._client.get(f"{self.host}/api/tags", timeout=15)
             r.raise_for_status()
@@ -54,14 +54,14 @@ class OllamaClient:
     def chat(
         self,
         model: str,
-        messages: List[Dict[str, str]],
+        messages: list[dict[str, str]],
         *,
-        fmt: Optional[str] = None,
-        options: Optional[Dict[str, Any]] = None,
+        fmt: str | None = None,
+        options: dict[str, Any] | None = None,
         keep_alive: str = "10m",
-        timeout: Optional[float] = None,
-    ) -> Dict[str, Any]:
-        body: Dict[str, Any] = {
+        timeout: float | None = None,
+    ) -> dict[str, Any]:
+        body: dict[str, Any] = {
             "model": model,
             "messages": messages,
             "stream": False,
@@ -95,7 +95,7 @@ class OllamaClient:
         except Exception:  # noqa: BLE001
             pass
 
-    def __enter__(self) -> "OllamaClient":
+    def __enter__(self) -> OllamaClient:
         return self
 
     def __exit__(self, *exc) -> None:

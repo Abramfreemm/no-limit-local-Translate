@@ -129,7 +129,7 @@ def main() -> int:
     print("-" * 100)
     print(f"[平均置信度] {avg:.3f}")
     print(f"[性能目标] {'达成 ✅' if dt <= 2.0 else '未达成 ⚠️（CPU 环境可放宽，或降低 DPI）'}")
-    print(f"[结构校验] 文本+坐标+置信度三要素齐全 ✅")
+    print("[结构校验] 文本+坐标+置信度三要素齐全 ✅")
     return 0
 
 

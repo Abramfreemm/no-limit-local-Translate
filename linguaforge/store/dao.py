@@ -10,15 +10,16 @@ from __future__ import annotations
 
 import hashlib
 import json
-import sqlite3
 import time
 import uuid
+from collections.abc import Iterable, Sequence
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any
 
 from .schema import connect, resolve_db_path
 
 # ---------------------------------------------------------------- 稳定 ID
+
 
 def stable_block_id(page_index: int, seq: int, text: str) -> str:
     """生成与解析次数无关的稳定块 ID。
@@ -41,6 +42,7 @@ def text_sha256(text: str) -> str:
 
 # ---------------------------------------------------------------- Store
 
+
 class Store:
     """SQLite 存储门面。线程安全：每个线程各自 connect。"""
 
@@ -55,7 +57,7 @@ class Store:
         except Exception:
             pass
 
-    def __enter__(self) -> "Store":
+    def __enter__(self) -> Store:
         return self
 
     def __exit__(self, *exc) -> None:
@@ -75,7 +77,7 @@ class Store:
         model: str = "",
         output_mode: str = "markdown",
         output_path: str = "",
-        settings: Optional[Dict[str, Any]] = None,
+        settings: dict[str, Any] | None = None,
     ) -> str:
         tid = new_task_id()
         now = time.time()
@@ -85,18 +87,29 @@ class Store:
             " created_at, updated_at, settings_json)"
             " VALUES(?,?,?,?,?,?,?,?,?,?,?,'running',?,?,?)",
             (
-                tid, str(source_path), source_sha256, source_format, source_size,
-                page_count, lang_src, lang_dst, model, output_mode, output_path,
-                now, now, json.dumps(settings or {}, ensure_ascii=False),
+                tid,
+                str(source_path),
+                source_sha256,
+                source_format,
+                source_size,
+                page_count,
+                lang_src,
+                lang_dst,
+                model,
+                output_mode,
+                output_path,
+                now,
+                now,
+                json.dumps(settings or {}, ensure_ascii=False),
             ),
         )
         return tid
 
-    def get_task(self, task_id: str) -> Optional[Dict[str, Any]]:
+    def get_task(self, task_id: str) -> dict[str, Any] | None:
         row = self.conn.execute("SELECT * FROM task WHERE id=?", (task_id,)).fetchone()
         return dict(row) if row else None
 
-    def find_task_by_source(self, source_sha256: str, lang_dst: str) -> Optional[Dict[str, Any]]:
+    def find_task_by_source(self, source_sha256: str, lang_dst: str) -> dict[str, Any] | None:
         """按源文件指纹找历史任务 —— 续翻用。"""
         row = self.conn.execute(
             "SELECT * FROM task WHERE source_sha256=? AND lang_dst=?"
@@ -119,13 +132,13 @@ class Store:
         else:
             self.update_task(task_id, status=status, error=error)
 
-    def list_tasks(self, limit: int = 50) -> List[Dict[str, Any]]:
+    def list_tasks(self, limit: int = 50) -> list[dict[str, Any]]:
         rows = self.conn.execute(
             "SELECT * FROM task ORDER BY created_at DESC LIMIT ?", (limit,)
         ).fetchall()
         return [dict(r) for r in rows]
 
-    def list_resumable(self) -> List[Dict[str, Any]]:
+    def list_resumable(self) -> list[dict[str, Any]]:
         """中断/暂停/失败的任务 —— 重启后可续跑。"""
         rows = self.conn.execute(
             "SELECT * FROM task WHERE status IN ('running','paused','failed')"
@@ -179,22 +192,28 @@ class Store:
         rows = []
         for seq, b in enumerate(blocks):
             bid = stable_block_id(page_index, seq, b.text or "")
-            b.id = bid                      # 回写，让上层拿到稳定 ID
+            b.id = bid  # 回写，让上层拿到稳定 ID
             b.page_index = page_index
             b.reading_order = seq
-            rows.append((
-                task_id, bid, page_index, seq,
-                b.type.value if hasattr(b.type, "value") else str(b.type),
-                json.dumps(list(b.bbox), ensure_ascii=False),
-                b.text or "", b.translated or "",
-                json.dumps(b.style.to_dict(), ensure_ascii=False),
-                json.dumps([r.to_dict() for r in b.runs], ensure_ascii=False),
-                1 if getattr(b, "is_translatable", True) else 0,
-                b.state.value if hasattr(b.state, "value") else str(b.state),
-                b.origin.value if hasattr(b.origin, "value") else str(b.origin),
-                float(b.confidence or 0.0),
-                json.dumps(b.meta or {}, ensure_ascii=False),
-            ))
+            rows.append(
+                (
+                    task_id,
+                    bid,
+                    page_index,
+                    seq,
+                    b.type.value if hasattr(b.type, "value") else str(b.type),
+                    json.dumps(list(b.bbox), ensure_ascii=False),
+                    b.text or "",
+                    b.translated or "",
+                    json.dumps(b.style.to_dict(), ensure_ascii=False),
+                    json.dumps([r.to_dict() for r in b.runs], ensure_ascii=False),
+                    1 if getattr(b, "is_translatable", True) else 0,
+                    b.state.value if hasattr(b.state, "value") else str(b.state),
+                    b.origin.value if hasattr(b.origin, "value") else str(b.origin),
+                    float(b.confidence or 0.0),
+                    json.dumps(b.meta or {}, ensure_ascii=False),
+                )
+            )
         cur = self.conn.cursor()
         cur.execute("BEGIN")
         try:
@@ -215,7 +234,7 @@ class Store:
             raise
         return len(rows)
 
-    def load_translated_map(self, task_id: str) -> Dict[str, str]:
+    def load_translated_map(self, task_id: str) -> dict[str, str]:
         """取出已完成译文：block_id -> translated。续翻时用于回填，避免重翻。"""
         rows = self.conn.execute(
             "SELECT block_id, translated FROM block"
@@ -245,14 +264,14 @@ class Store:
             raise
         return len(rows)
 
-    def get_page_blocks(self, task_id: str, page_index: int) -> List[Dict[str, Any]]:
+    def get_page_blocks(self, task_id: str, page_index: int) -> list[dict[str, Any]]:
         rows = self.conn.execute(
             "SELECT * FROM block WHERE task_id=? AND page_index=? ORDER BY seq",
             (task_id, page_index),
         ).fetchall()
         return [dict(r) for r in rows]
 
-    def count_blocks(self, task_id: str, state: Optional[str] = None) -> int:
+    def count_blocks(self, task_id: str, state: str | None = None) -> int:
         if state:
             row = self.conn.execute(
                 "SELECT COUNT(*) c FROM block WHERE task_id=? AND state=?",
@@ -264,13 +283,13 @@ class Store:
             ).fetchone()
         return int(row["c"]) if row else 0
 
-    def pending_pages(self, task_id: str, total_pages: int) -> List[int]:
+    def pending_pages(self, task_id: str, total_pages: int) -> list[int]:
         """返回尚未翻译完的页码。"""
         done = self.get_done_pages(task_id)
         return [i for i in range(total_pages) if i not in done]
 
     # ================= 翻译记忆 =================
-    def tm_get(self, src: str, lang_src: str, lang_dst: str, model: str) -> Optional[str]:
+    def tm_get(self, src: str, lang_src: str, lang_dst: str, model: str) -> str | None:
         h = text_sha256(src.strip())
         row = self.conn.execute(
             "SELECT dst_text FROM translation_memory"
@@ -287,7 +306,7 @@ class Store:
         return None
 
     def tm_put_many(
-        self, pairs: Iterable[Tuple[str, str]], lang_src: str, lang_dst: str, model: str
+        self, pairs: Iterable[tuple[str, str]], lang_src: str, lang_dst: str, model: str
     ) -> int:
         now = time.time()
         rows = []
@@ -314,18 +333,18 @@ class Store:
             raise
         return len(rows)
 
-    def tm_stats(self) -> Dict[str, int]:
+    def tm_stats(self) -> dict[str, int]:
         row = self.conn.execute(
             "SELECT COUNT(*) c, COALESCE(SUM(hit_count),0) h FROM translation_memory"
         ).fetchone()
         return {"entries": int(row["c"]), "hits": int(row["h"])}
 
-    def tm_export(self) -> Dict[str, str]:
+    def tm_export(self) -> dict[str, str]:
         rows = self.conn.execute("SELECT src_text, dst_text FROM translation_memory").fetchall()
         return {r["src_text"]: r["dst_text"] for r in rows}
 
     # ================= 术语表 =================
-    def list_glossary(self, lang_src: str = "", lang_dst: str = "") -> List[Dict[str, Any]]:
+    def list_glossary(self, lang_src: str = "", lang_dst: str = "") -> list[dict[str, Any]]:
         if lang_src:
             rows = self.conn.execute(
                 "SELECT * FROM glossary WHERE lang_src=? AND lang_dst=? ORDER BY id",
@@ -336,8 +355,14 @@ class Store:
         return [dict(r) for r in rows]
 
     def add_glossary(
-        self, term: str, translation: str, lang_src: str = "en", lang_dst: str = "zh-Hans",
-        case_sensitive: int = 0, do_not_translate: int = 0, note: str = "",
+        self,
+        term: str,
+        translation: str,
+        lang_src: str = "en",
+        lang_dst: str = "zh-Hans",
+        case_sensitive: int = 0,
+        do_not_translate: int = 0,
+        note: str = "",
     ) -> int:
         cur = self.conn.execute(
             "INSERT INTO glossary(lang_src, lang_dst, term, translation, case_sensitive,"

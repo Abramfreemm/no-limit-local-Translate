@@ -1,10 +1,10 @@
 """命令行入口。
 
-    python -m linguaforge.cli doctor
-    python -m linguaforge.cli models
-    python -m linguaforge.cli translate input.pdf [-o out.md] [--fmt markdown|txt]
-                                  [--dst zh-Hans] [--src auto] [--model translategemma:12b]
-                                  [--bilingual] [--glossary terms.csv] [--tm tm.json] [--no-ocr]
+python -m linguaforge.cli doctor
+python -m linguaforge.cli models
+python -m linguaforge.cli translate input.pdf [-o out.md] [--fmt markdown|txt]
+                              [--dst zh-Hans] [--src auto] [--model translategemma:12b]
+                              [--bilingual] [--glossary terms.csv] [--tm tm.json] [--no-ocr]
 """
 
 from __future__ import annotations
@@ -59,7 +59,7 @@ def cmd_doctor(cfg: Config) -> int:
 
     # PDF 栈
     try:
-        import pdfplumber, pypdfium2, pypdf, reportlab  # noqa: F401
+        import reportlab  # noqa: F401
 
         _print("[OK]   PDF 栈: pdfplumber + pypdfium2 + pypdf + reportlab")
     except Exception as e:  # noqa: BLE001
@@ -117,7 +117,6 @@ def cmd_translate(args: argparse.Namespace, cfg: Config) -> int:
 
     _print(f"[run] {src.name} -> {cfg.lang_dst}  model={cfg.ollama.model}")
 
-    t0 = time.time()
     last = [0.0]
 
     def on_progress(stage: str, cur: int, total: int, msg: str) -> None:
@@ -182,7 +181,7 @@ def build_parser() -> argparse.ArgumentParser:
     t.add_argument("--no-resume", action="store_true", help="忽略断点，从头重翻")
     t.add_argument("--src", default="auto", help="源语言（auto 为自动）")
     t.add_argument("--dst", default="zh-Hans", help="目标语言")
-    t.add_argument("--model", help=f"覆盖默认模型")
+    t.add_argument("--model", help="覆盖默认模型")
     t.add_argument("--bilingual", action="store_true", help="双语对照输出")
     t.add_argument("--glossary", help="术语表 CSV/JSON")
     t.add_argument("--tm", help="翻译记忆 JSON（自动读写）")

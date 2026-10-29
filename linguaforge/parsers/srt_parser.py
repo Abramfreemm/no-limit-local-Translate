@@ -37,10 +37,10 @@ class SrtParseError(RuntimeError):
 class SrtParser:
     """解析 .srt / .vtt。用法：
 
-        with SrtParser(cfg) as p:
-            p.open(path)
-            for page in p.iter_pages():
-                ...
+    with SrtParser(cfg) as p:
+        p.open(path)
+        for page in p.iter_pages():
+            ...
     """
 
     extensions: set = {".srt", ".vtt"}
@@ -74,9 +74,7 @@ class SrtParser:
         except Exception as e:
             raise SrtParseError(f"字幕解析失败：{p.name}: {e}") from e
         if not self._cues:
-            raise SrtParseError(
-                f"未在 {p.name} 中找到任何字幕时间轴（文件为空或不是 SRT/VTT）"
-            )
+            raise SrtParseError(f"未在 {p.name} 中找到任何字幕时间轴（文件为空或不是 SRT/VTT）")
         self._title = p.stem
         return self
 
@@ -181,7 +179,7 @@ def parse_cues(raw: str) -> list[dict]:
         if m:
             start = _hhmmss(m.group(1), m.group(2), m.group(3), m.group(4))
             end = _hhmmss(m.group(5), m.group(6), m.group(7), m.group(8))
-            settings = line[m.end():].strip()
+            settings = line[m.end() :].strip()
             idx: int | None = None
             if pending_id is not None and _RE_INT.match(pending_id.strip()):
                 idx = int(pending_id.strip())

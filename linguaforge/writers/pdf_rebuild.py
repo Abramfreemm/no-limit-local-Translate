@@ -25,8 +25,8 @@ import io
 import re
 import shutil
 import tempfile
+from collections.abc import Sequence
 from pathlib import Path
-from typing import List, Optional, Sequence, Tuple
 
 from pypdf import PdfReader, PdfWriter
 from pypdf.generic import ContentStream
@@ -37,7 +37,7 @@ from reportlab.pdfgen import canvas
 from ..core.docir import BlockType, Page
 from ..core.fonts import ensure_body_font, ensure_bold_font
 
-MIN_FONT = 4.0            # 小于这个字号人眼不可读，宁可溢出也不再缩
+MIN_FONT = 4.0  # 小于这个字号人眼不可读，宁可溢出也不再缩
 MAX_FONT = 26.0
 LINE_GAP = 1.22
 _BOLD_TYPES = (BlockType.TITLE, BlockType.HEADING)
@@ -50,15 +50,15 @@ _TEXT_OPS = frozenset({b"Tj", b"TJ", b"'", b'"'})
 _TOKEN = re.compile(r"\s+|[A-Za-z0-9_\-./:=@?&%+#,;'\"]+|[^\s]")
 
 
-def _tokenize(s: str) -> List[str]:
+def _tokenize(s: str) -> list[str]:
     return [m.group(0) for m in _TOKEN.finditer(s)]
 
 
-def wrap_text(text: str, font: str, size: float, max_width: float) -> List[str]:
+def wrap_text(text: str, font: str, size: float, max_width: float) -> list[str]:
     """把文本按宽度换行。英文单词尽量不拆，中文逐字可断。"""
     if max_width <= 1:
         return [text]
-    lines: List[str] = []
+    lines: list[str] = []
     for para in text.split("\n"):
         if not para.strip():
             continue
@@ -82,7 +82,7 @@ def fit_text(
     max_w: float,
     max_h: float,
     min_size: float = MIN_FONT,
-) -> Tuple[float, List[str]]:
+) -> tuple[float, list[str]]:
     """自适应字号：从 start_size 起逐步缩小，直到文本能装进 (max_w, max_h)。"""
     size = float(start_size or 9.0)
     if size <= 0 or size > MAX_FONT:
@@ -97,7 +97,7 @@ def fit_text(
     return min_size, wrap_text(text, font, min_size, max_w)
 
 
-def _page_size(page_obj) -> Tuple[float, float]:
+def _page_size(page_obj) -> tuple[float, float]:
     try:
         mb = page_obj.mediabox
         return float(mb.width), float(mb.height)
@@ -137,7 +137,7 @@ def build_overlay(
     height: float,
     *,
     body_font: str,
-    bold_font: Optional[str] = None,
+    bold_font: str | None = None,
     mask: bool = True,
     mask_pad: float = 0.6,
     default_size: float = 9.0,
@@ -148,7 +148,7 @@ def build_overlay(
 
     for b in page.blocks_sorted:
         if not b.bbox or all(v == 0 for v in b.bbox):
-            continue                       # 无坐标块不参与回填（图文_CACHE）
+            continue  # 无坐标块不参与回填（图文_CACHE）
         if not b.translated and not b.text:
             continue
         text = (b.translated or b.text or "").strip()
@@ -158,16 +158,19 @@ def build_overlay(
         x0, top, x1, bottom = b.bbox
         box_w = max(1.0, x1 - x0)
         box_h = max(1.0, bottom - top)
-        py_top = height - top              # 换算：左上原点 -> 左下原点
+        py_top = height - top  # 换算：左上原点 -> 左下原点
         py_bottom = height - bottom
 
         if mask:
             c.setFillColor(colors.white)
             c.setStrokeColor(colors.white)
             c.rect(
-                x0 - mask_pad, py_bottom - mask_pad,
-                box_w + mask_pad * 2, box_h + mask_pad * 2,
-                stroke=0, fill=1,
+                x0 - mask_pad,
+                py_bottom - mask_pad,
+                box_w + mask_pad * 2,
+                box_h + mask_pad * 2,
+                stroke=0,
+                fill=1,
             )
 
         want_bold = bool(getattr(b.style, "bold", False)) or b.type in _BOLD_TYPES
@@ -187,7 +190,7 @@ def build_overlay(
         c.setFont(font, size)
 
         lh = size * LINE_GAP
-        y = py_top - size * 1.02           # 首行基线留一点呼吸空间
+        y = py_top - size * 1.02  # 首行基线留一点呼吸空间
         align = getattr(b.style, "align", "left") or "left"
         # fit_text 已保证总高不超框，这里只是极端情况的兜底：
         # 第一行必须无条件画（否则整块被吞），后续行才检查溢出。
@@ -233,7 +236,7 @@ class PDFRebuildWriter:
         bold_font: str | None = None,
         mask: bool = True,
         shard_pages: int = 150,
-        tmp_dir: Optional[str | Path] = None,
+        tmp_dir: str | Path | None = None,
         log=None,
     ) -> None:
         self.src = Path(src)
@@ -254,13 +257,13 @@ class PDFRebuildWriter:
         # 若把分片写到源文件旁边，最后跨卷 rename 会直接失败（WinError 17）。
         self.tmp_dir = Path(tmp_dir) if tmp_dir else Path(tempfile.gettempdir()) / "lf_parts"
         self.tmp_dir.mkdir(parents=True, exist_ok=True)
-        self._shards: List[Path] = []
+        self._shards: list[Path] = []
         self._si = 0
         self._writer = PdfWriter()
         self._pending = 0
         self.pages_written = 0
-        self.stripped_pages = 0     # 走"剥离原文"路径的页数（版式零损伤）
-        self.masked_pages = 0       # 走"白底遮盖"兜底的页数
+        self.stripped_pages = 0  # 走"剥离原文"路径的页数（版式零损伤）
+        self.masked_pages = 0  # 走"白底遮盖"兜底的页数
 
     # ---------------- 主流程 ----------------
     def add_page(self, page: Page) -> None:
@@ -301,8 +304,12 @@ class PDFRebuildWriter:
                 self.masked_pages += 1
 
             overlay_bytes = build_overlay(
-                page, w, h,
-                body_font=self.body_font, bold_font=self.bold_font, mask=use_mask,
+                page,
+                w,
+                h,
+                body_font=self.body_font,
+                bold_font=self.bold_font,
+                mask=use_mask,
             )
             overlay_obj = PdfReader(io.BytesIO(overlay_bytes)).pages[0]
             work.merge_page(overlay_obj)

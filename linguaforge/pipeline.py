@@ -18,18 +18,19 @@ from __future__ import annotations
 
 import hashlib
 import time
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Sequence
+from typing import Any
 
 from .core.config import Config
-from .core.docir import Block, BlockState, BlockType, DocIR, Page
+from .core.docir import Block, BlockState, BlockType, Page
 from .ocr import RapidOCREngine
 from .parsers import PDFParser, TextParser
 from .parsers.render import PDFRenderer
-from .store import Store, stable_block_id
+from .store import Store
 from .translate.ollama_client import OllamaClient
-from .translate.translator import Glossary, TranslationMemory, TranslateStats, Translator
+from .translate.translator import TranslateStats, Translator
 from .writers.markdown import render_pages as render_markdown_pages
 from .writers.text import render_page_text
 
@@ -62,12 +63,12 @@ class PipelineResult:
     blocks: int = 0
     translated: int = 0
     ocr_pages: int = 0
-    reused: int = 0             # 续翻时从库里直接复用的已译块数
+    reused: int = 0  # 续翻时从库里直接复用的已译块数
     elapsed_s: float = 0.0
     model: str = ""
     task_id: str = ""
-    stats: Optional[TranslateStats] = None
-    errors: List[str] = field(default_factory=list)
+    stats: TranslateStats | None = None
+    errors: list[str] = field(default_factory=list)
 
     def summary(self) -> str:
         s = self.stats
@@ -81,8 +82,8 @@ class PipelineResult:
         )
 
 
-ProgressCB = Optional[Callable[[str, int, int, str], None]]
-CancelCB = Optional[Callable[[], bool]]
+ProgressCB = Callable[[str, int, int, str], None] | None
+CancelCB = Callable[[], bool] | None
 
 
 def file_sha256(path: str | Path, chunk: int = 1 << 20) -> str:
@@ -142,11 +143,25 @@ def get_parser(path: str | Path, cfg: Config):
     return None, False
 
 
-SUPPORTED_IN = (
-    {".pdf", ".docx", ".pptx", ".xlsx", ".xlsm", ".html", ".htm", ".xhtml",
-     ".srt", ".vtt", ".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp", ".webp"}
-    | TEXT_EXT
-)
+SUPPORTED_IN = {
+    ".pdf",
+    ".docx",
+    ".pptx",
+    ".xlsx",
+    ".xlsm",
+    ".html",
+    ".htm",
+    ".xhtml",
+    ".srt",
+    ".vtt",
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".tif",
+    ".tiff",
+    ".bmp",
+    ".webp",
+} | TEXT_EXT
 
 
 class _TextSink:
@@ -161,9 +176,7 @@ class _TextSink:
         if self.fmt == "markdown":
             frag = render_markdown_pages("", window, total, self.bilingual)
         else:
-            frag = "\n".join(
-                line for p in window for line in render_page_text(p, self.bilingual)
-            )
+            frag = "\n".join(line for p in window for line in render_page_text(p, self.bilingual))
         if frag.strip():
             self.fh.write(frag)
             if not frag.endswith("\n"):
@@ -194,7 +207,7 @@ class _BinarySink:
         self.log = log
         # 字幕类 Writer 靠 state["buffer"] 判断是否启用累积模式，
         # 不预置的话 render_pages 的返回片段会全部丢掉，finalize 写出空文件。
-        self.state: Dict[str, Any] = {
+        self.state: dict[str, Any] = {
             "fmt": fmt,
             "index": 1,
             "cursor": 0.0,
@@ -247,11 +260,11 @@ class Pipeline:
 
     def __init__(
         self,
-        cfg: Optional[Config] = None,
+        cfg: Config | None = None,
         ocr=None,
-        translator: Optional[Translator] = None,
-        log: Optional[Callable[[str], None]] = None,
-        store: Optional[Store] = None,
+        translator: Translator | None = None,
+        log: Callable[[str], None] | None = None,
+        store: Store | None = None,
     ) -> None:
         self.cfg = cfg or Config()
         self.log = log or (lambda _m: None)
@@ -276,7 +289,7 @@ class Pipeline:
         return self._ocr
 
     @property
-    def store(self) -> Optional[Store]:
+    def store(self) -> Store | None:
         """懒开数据库连接。流水线不强制依赖存储，取不到就降级为不续翻。"""
         if self._store is None:
             try:
@@ -298,14 +311,14 @@ class Pipeline:
     def run(
         self,
         src: str | Path,
-        out: Optional[str | Path] = None,
-        fmt: Optional[str] = None,
+        out: str | Path | None = None,
+        fmt: str | None = None,
         cancel: CancelCB = None,
         on_progress: ProgressCB = None,
         *,
         resume: bool = True,
-        page_range: Optional[tuple] = None,
-        store: Optional[Store] = None,
+        page_range: tuple | None = None,
+        store: Store | None = None,
     ) -> PipelineResult:
         """执行翻译任务。
 
@@ -331,8 +344,9 @@ class Pipeline:
         out_path = Path(out) if out else self._default_out(src, fmt)
         out_path.parent.mkdir(parents=True, exist_ok=True)
 
-        res = PipelineResult(source=str(src), output=str(out_path), fmt=fmt,
-                             model=self.cfg.ollama.model)
+        res = PipelineResult(
+            source=str(src), output=str(out_path), fmt=fmt, model=self.cfg.ollama.model
+        )
         if store is not None:
             self._store = store
             self._own_store = False
@@ -343,7 +357,8 @@ class Pipeline:
             parser, can_render = get_parser(src, self.cfg)
             if parser is None:
                 return PipelineResult(
-                    ok=False, source=str(src),
+                    ok=False,
+                    source=str(src),
                     errors=[f"暂不支持的格式: {ext}（支持：{', '.join(sorted(SUPPORTED_IN))}）"],
                 )
             parser.open(src)
@@ -368,7 +383,11 @@ class Pipeline:
                 # 已完成（done）的任务同样可复用：同一文件再翻一次不该重新烧 token。
                 # 换模型则视为"要更好的译文"，从头重翻。
                 reusable = prev is not None and prev.get("status") in {
-                    "running", "paused", "failed", "canceled", "done",
+                    "running",
+                    "paused",
+                    "failed",
+                    "canceled",
+                    "done",
                 }
                 if reusable and prev.get("model") and prev["model"] != self.cfg.ollama.model:
                     self.log(
@@ -382,8 +401,10 @@ class Pipeline:
                         self.log(f"[resume] 续翻任务 {task_id}，已完成 {len(done_pages)} 页")
                 else:
                     task_id = st.create_task(
-                        str(src), source_sha256=sha,
-                        lang_dst=self.cfg.lang_dst, output_mode=fmt,
+                        str(src),
+                        source_sha256=sha,
+                        lang_dst=self.cfg.lang_dst,
+                        output_mode=fmt,
                         model=self.cfg.ollama.model,
                     )
                 res.task_id = task_id
@@ -417,7 +438,7 @@ class Pipeline:
                     sink = _TextSink(fh, fmt, bilingual)
 
             state = {"header_done": False}
-            window: List[Page] = []
+            window: list[Page] = []
             window_chars = 0
             pages_done = 0
 
@@ -441,18 +462,48 @@ class Pipeline:
                 if on_progress:
                     on_progress("parse", pages_done, total, f"解析第 {pages_done}/{total} 页")
 
-                if (len(window) >= self.cfg.perf.window_pages
-                        or window_chars >= self.cfg.perf.window_chars):
-                    self._flush(window, sink, fmt, bilingual, res, cancel, on_progress,
-                                pages_done, total, title, state, st, task_id, done_pages)
+                if (
+                    len(window) >= self.cfg.perf.window_pages
+                    or window_chars >= self.cfg.perf.window_chars
+                ):
+                    self._flush(
+                        window,
+                        sink,
+                        fmt,
+                        bilingual,
+                        res,
+                        cancel,
+                        on_progress,
+                        pages_done,
+                        total,
+                        title,
+                        state,
+                        st,
+                        task_id,
+                        done_pages,
+                    )
                     window, window_chars = [], 0
                     if cancel and cancel():
                         res.errors.append("用户取消")
                         break
 
             if window:
-                self._flush(window, sink, fmt, bilingual, res, cancel, on_progress,
-                            pages_done, total, title, state, st, task_id, done_pages)
+                self._flush(
+                    window,
+                    sink,
+                    fmt,
+                    bilingual,
+                    res,
+                    cancel,
+                    on_progress,
+                    pages_done,
+                    total,
+                    title,
+                    state,
+                    st,
+                    task_id,
+                    done_pages,
+                )
 
             if sink is not None:
                 sink.finalize(out_path)
@@ -487,7 +538,7 @@ class Pipeline:
     # ---------------- 窗口处理 ----------------
     def _flush(
         self,
-        window: List[Page],
+        window: list[Page],
         sink,
         fmt: str,
         bilingual: bool,
@@ -497,10 +548,10 @@ class Pipeline:
         pages_done: int,
         total: int,
         title: str = "",
-        state: Optional[dict] = None,
-        st: Optional[Store] = None,
+        state: dict | None = None,
+        st: Store | None = None,
         task_id: str = "",
-        done_pages: Optional[set] = None,
+        done_pages: set | None = None,
     ) -> None:
         # 首次 flush 时补文档标题（正文自带标题块就不重复写，也不重复翻译）
         if state is not None and not state.get("header_done"):
@@ -515,7 +566,7 @@ class Pipeline:
                     sink.write_raw(f"{zh}\n{'=' * min(60, max(8, len(zh)))}\n\n")
 
         done_pages = done_pages or set()
-        need_translate: List[Block] = []
+        need_translate: list[Block] = []
 
         for p in window:
             # 1) 先落盘一次，拿到稳定 block_id（ID 由 page_index+seq+原文决定）
@@ -550,8 +601,8 @@ class Pipeline:
             stats = self.translator.translate_blocks(
                 need_translate,
                 cancel=cancel,
-                on_batch=lambda i, n: on_progress and on_progress(
-                    "translate", i, n, f"翻译批次 {i}/{n}"
+                on_batch=lambda i, n: (
+                    on_progress and on_progress("translate", i, n, f"翻译批次 {i}/{n}")
                 ),
             )
             res.translated += stats.translated
@@ -574,8 +625,9 @@ class Pipeline:
                         continue
                     try:
                         st.update_translations(task_id, p.blocks)
-                        st.upsert_page(task_id, p.index, status="translated",
-                                       block_count=len(p.blocks))
+                        st.upsert_page(
+                            task_id, p.index, status="translated", block_count=len(p.blocks)
+                        )
                     except Exception as e:  # noqa: BLE001
                         self.log(f"[store] p{p.index + 1} 回写失败：{e}")
 
@@ -611,9 +663,9 @@ class Pipeline:
         return src.with_name(f"{src.stem}.translated{ext}")
 
     # ---------------- 连通性自检 ----------------
-    def precheck(self) -> List[str]:
+    def precheck(self) -> list[str]:
         """返回问题列表；空列表表示就绪。"""
-        problems: List[str] = []
+        problems: list[str] = []
         try:
             with OllamaClient(self.cfg.ollama.host, timeout=10) as c:
                 c.version()

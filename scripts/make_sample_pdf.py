@@ -76,8 +76,12 @@ def build(pages: int, out: Path) -> Path:
 
     out.parent.mkdir(parents=True, exist_ok=True)
     doc = SimpleDocTemplate(
-        str(out), pagesize=A4,
-        leftMargin=22 * mm, rightMargin=22 * mm, topMargin=22 * mm, bottomMargin=22 * mm,
+        str(out),
+        pagesize=A4,
+        leftMargin=22 * mm,
+        rightMargin=22 * mm,
+        topMargin=22 * mm,
+        bottomMargin=22 * mm,
         title="XJ-2000 Installation and Maintenance Manual",
         author="LinguaForge Test Fixture",
     )
@@ -130,7 +134,9 @@ def build(pages: int, out: Path) -> Path:
                     ]
                 )
             )
-            story.append( KeepTogether([Paragraph("Table 2. Technical data", cap), Spacer(1, 2 * mm), t]))
+            story.append(
+                KeepTogether([Paragraph("Table 2. Technical data", cap), Spacer(1, 2 * mm), t])
+            )
             story.append(Spacer(1, 4 * mm))
 
         if p < pages - 1:

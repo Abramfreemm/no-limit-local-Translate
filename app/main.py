@@ -40,7 +40,7 @@ def _dump_crash(exc_type, exc, tb) -> None:
         d.mkdir(parents=True, exist_ok=True)
         (d / "logs").mkdir(exist_ok=True)
         with open(d / "logs" / "crash.log", "a", encoding="utf-8") as fh:
-            fh.write("\n==== %s ====\n" % _now())
+            fh.write(f"\n==== {_now()} ====\n")
             traceback.print_exception(exc_type, exc, tb, file=fh)
         path = d / "logs" / "crash.log"
     except Exception:  # noqa: BLE001
@@ -48,7 +48,7 @@ def _dump_crash(exc_type, exc, tb) -> None:
     try:
         from PySide6.QtWidgets import QApplication, QMessageBox
 
-        app = QApplication.instance() or QApplication(sys.argv)
+        QApplication.instance() or QApplication(sys.argv)  # 保活引用，无需变量
         QMessageBox.critical(
             None,
             "LinguaForge 遇到未处理的错误",
@@ -93,7 +93,7 @@ def main() -> int:
 
     if _is_cli():
         # 命令行：保持调用者的工作目录，相对路径才符合用户预期
-        _force_utf8_console()          # 否则 Windows 控制台按 GBK 解码，中文进度全是乱码
+        _force_utf8_console()  # 否则 Windows 控制台按 GBK 解码，中文进度全是乱码
         from linguaforge.cli import main as cli_main
 
         return cli_main(sys.argv[1:])

@@ -1,0 +1,117 @@
+name: CI · 门禁
+
+# 这是 0.1.0 的 P0-1 产物。此前仓库只有 release.yml（安装→打包→--version 冒烟），
+# 26 个单测与 ruff 全部只在本地跑过 —— 任何人 push 破坏测试的提交，CI 依然是绿的。
+# 本工作流把「静态检查 + 单测 + 许可 + 依赖漏洞」变成发版前的强制门禁。
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+# 只给读权限；写操作仅发生在 release.yml
+permissions:
+  contents: read
+
+jobs:
+  quality:
+    name: 静态检查 + 单测（${{ matrix.os }}）
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python-version: ["3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: 安装运行时依赖
+        # 用 requirements.txt 而非 requirements.lock —— lock 是本机 Windows 快照，
+      # 含 pywin32-ctypes 等平台专属包，在 ubuntu runner 上装不上。
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: 安装开发与门禁工具
+        run: pip install pytest pytest-cov ruff pip-licenses pip-audit
+
+      - name: 静态检查 · ruff check
+        run: ruff check .
+
+      - name: 静态检查 · ruff format
+        run: ruff format --check .
+
+      - name: 单元测试 · pytest
+        env:
+          PYTHONIOENCODING: utf-8
+          PYTHONUTF8: "1"
+        run: pytest tests -q --cov=linguaforge --cov-report=term-missing
+
+      - name: 依赖完整性 · pip check
+        shell: bash
+        # 已知例外：rapidocr-onnxruntime 硬声明 opencv-python，而我们安装的是
+        # headless 版（模块名同为 cv2，但不捆绑 Qt，避免与 PySide6 的 Qt 冲突）。
+        # 除这一条外的任何其他缺失依赖都必须让 CI 变红。
+        run: |
+          set -o pipefail
+          out=$(pip check 2>&1 || true)
+          echo "$out"
+          filtered=$(echo "$out" | grep -v "requires opencv-python, which is not installed" | grep -v "^$" || true)
+          if [ -n "$filtered" ]; then
+            echo "::error::存在未解决的依赖冲突"
+            exit 1
+          fi
+          echo "✅ 仅剩已知的 opencv-python/headless 例外"
+
+      - name: 许可合规 · 无强传染性 / 非商用许可
+        # 与 09 号合规清单第 1 节一致。这里不用 pip-licenses --fail-on，
+        # 因为它是子串匹配，"GPL" 会误伤 PySide6 的 LGPL-3.0（动态链接，允许）。
+        # 改为脚本精确判定：AGPL / 非 LGPL 的 GPL / NC / Nonstandard 才阻断。
+        shell: bash
+        run: |
+          pip-licenses --format=csv --with-urls --output-file=licenses.csv
+          python - <<'PY'
+          import csv, sys
+          bad = []
+          with open("licenses.csv", encoding="utf-8") as fh:
+              for row in csv.DictReader(fh):
+                  lic = (row.get("License") or "").strip()
+                  low = lic.lower()
+                  if "agpl" in low:
+                      bad.append((row["Name"], lic, "AGPL 强传染"))
+                  elif "gpl" in low and "lgpl" not in low:
+                      bad.append((row["Name"], lic, "GPL 强传染（非 LGPL）"))
+                  elif "nc" == low or "non-commercial" in low or "noncommercial" in low:
+                      bad.append((row["Name"], lic, "非商用限制"))
+                  elif low.startswith("nonstandard") or "proprietary" in low:
+                      bad.append((row["Name"], lic, "非标准/专有"))
+          if bad:
+              for n, l, why in bad:
+                  print(f"::error::{n} = {l} → {why}")
+              sys.exit(1)
+          print("✅ 无强传染性 / 非商用许可依赖")
+          PY
+
+      - name: 依赖漏洞 · pip-audit
+        # 高危必须清零；若暂时无法升级，须在 09 号风险表登记缓解措施并在此豁免
+        run: |
+          pip-audit -r requirements.lock --strict --progress-spinner=off || {
+            echo "::warning::pip-audit 报告漏洞，请核对 09 号风险表"
+            exit 1
+          }
+
+      - name: 上传许可清单
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: licenses-${{ matrix.os }}
+          path: licenses.csv
+          if-no-files-found: ignore

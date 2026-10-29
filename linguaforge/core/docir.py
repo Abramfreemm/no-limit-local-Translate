@@ -13,16 +13,17 @@ from __future__ import annotations
 
 import time
 import uuid
-from dataclasses import dataclass, field, asdict
-from enum import Enum
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from collections.abc import Iterable
+from dataclasses import asdict, dataclass, field
+from enum import StrEnum
+from typing import Any
 
-BBox = Tuple[float, float, float, float]  # (x0, top, x1, bottom)
+BBox = tuple[float, float, float, float]  # (x0, top, x1, bottom)
 
 DOCIR_VERSION = "1.0"
 
 
-class BlockType(str, Enum):
+class BlockType(StrEnum):
     """块类型。决定排版与翻译策略。"""
 
     TITLE = "title"
@@ -40,7 +41,7 @@ class BlockType(str, Enum):
     UNKNOWN = "unknown"
 
     @classmethod
-    def coerce(cls, v: Any) -> "BlockType":
+    def coerce(cls, v: Any) -> BlockType:
         if isinstance(v, cls):
             return v
         try:
@@ -49,17 +50,17 @@ class BlockType(str, Enum):
             return cls.UNKNOWN
 
 
-class BlockState(str, Enum):
+class BlockState(StrEnum):
     """块的处理状态。断点续翻依赖它。"""
 
     PENDING = "pending"
-    EXTRACTED = "extracted"      # 已抽取，待翻译
-    TRANSLATED = "translated"    # 已翻译
-    FAILED = "failed"            # 翻译失败，可重试
-    SKIPPED = "skipped"          # 无需翻译（纯数字 / 空白 / 已为目标语言）
+    EXTRACTED = "extracted"  # 已抽取，待翻译
+    TRANSLATED = "translated"  # 已翻译
+    FAILED = "failed"  # 翻译失败，可重试
+    SKIPPED = "skipped"  # 无需翻译（纯数字 / 空白 / 已为目标语言）
 
     @classmethod
-    def coerce(cls, v: Any) -> "BlockState":
+    def coerce(cls, v: Any) -> BlockState:
         if isinstance(v, cls):
             return v
         try:
@@ -68,15 +69,15 @@ class BlockState(str, Enum):
             return cls.PENDING
 
 
-class Origin(str, Enum):
+class Origin(StrEnum):
     """文本来源。"""
 
     TEXT_LAYER = "text_layer"  # PDF 内嵌文本层
-    OCR = "ocr"                # 光栅 OCR 识别
-    HYBRID = "hybrid"          # 同一页混合
+    OCR = "ocr"  # 光栅 OCR 识别
+    HYBRID = "hybrid"  # 同一页混合
 
     @classmethod
-    def coerce(cls, v: Any) -> "Origin":
+    def coerce(cls, v: Any) -> Origin:
         if isinstance(v, cls):
             return v
         try:
@@ -96,11 +97,11 @@ class Run:
     italic: bool = False
     color: str = ""
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, d: Dict[str, Any]) -> "Run":
+    def from_dict(cls, d: dict[str, Any]) -> Run:
         return cls(
             text=d.get("text", ""),
             font=d.get("font", ""),
@@ -119,18 +120,18 @@ class Style:
     size: float = 0.0
     bold: bool = False
     italic: bool = False
-    align: str = "left"       # left | center | right | justify
+    align: str = "left"  # left | center | right | justify
     color: str = ""
     line_height: float = 0.0
     space_before: float = 0.0
     space_after: float = 0.0
-    level: int = 0            # 标题层级
+    level: int = 0  # 标题层级
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return asdict(self)
 
     @classmethod
-    def from_dict(cls, d: Dict[str, Any]) -> "Style":
+    def from_dict(cls, d: dict[str, Any]) -> Style:
         known = {k: v for k, v in d.items() if k in cls.__dataclass_fields__}
         for f in ("size", "line_height", "space_before", "space_after"):
             if f in known:
@@ -148,7 +149,7 @@ class Block:
     type: BlockType = BlockType.PARAGRAPH
     bbox: BBox = (0.0, 0.0, 0.0, 0.0)
     text: str = ""
-    runs: List[Run] = field(default_factory=list)
+    runs: list[Run] = field(default_factory=list)
     style: Style = field(default_factory=Style)
     translated: str = ""
     state: BlockState = BlockState.PENDING
@@ -160,7 +161,7 @@ class Block:
     table_id: str = ""
     row: int = -1
     col: int = -1
-    meta: Dict[str, Any] = field(default_factory=dict)
+    meta: dict[str, Any] = field(default_factory=dict)
 
     # ---- 派生属性 ----
     @property
@@ -185,7 +186,7 @@ class Block:
         """对外呈现文本：有译文用译文，否则原文。"""
         return self.translated if self.translated else self.text
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
             "type": self.type.value,
@@ -207,7 +208,7 @@ class Block:
         }
 
     @classmethod
-    def from_dict(cls, d: Dict[str, Any]) -> "Block":
+    def from_dict(cls, d: dict[str, Any]) -> Block:
         return cls(
             id=d.get("id", uuid.uuid4().hex[:16]),
             type=BlockType.coerce(d.get("type")),
@@ -234,23 +235,23 @@ class Page:
     """一页。分页流式处理的核心单元。"""
 
     index: int = 0
-    width: float = 595.0     # A4 @72dpi
+    width: float = 595.0  # A4 @72dpi
     height: float = 842.0
-    blocks: List[Block] = field(default_factory=list)
+    blocks: list[Block] = field(default_factory=list)
     ocr_used: bool = False
     rotation: int = 0
     image_path: str = ""
-    meta: Dict[str, Any] = field(default_factory=dict)
+    meta: dict[str, Any] = field(default_factory=dict)
 
     @property
-    def blocks_sorted(self) -> List[Block]:
+    def blocks_sorted(self) -> list[Block]:
         return sorted(self.blocks, key=lambda b: b.reading_order)
 
     @property
-    def translatable_blocks(self) -> List[Block]:
+    def translatable_blocks(self) -> list[Block]:
         return [b for b in self.blocks_sorted if b.is_translatable]
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "index": self.index,
             "width": self.width,
@@ -263,7 +264,7 @@ class Page:
         }
 
     @classmethod
-    def from_dict(cls, d: Dict[str, Any]) -> "Page":
+    def from_dict(cls, d: dict[str, Any]) -> Page:
         return cls(
             index=int(d.get("index", 0)),
             width=float(d.get("width", 595.0)),
@@ -286,10 +287,10 @@ class DocIR:
     title: str = ""
     lang_src: str = "auto"
     lang_dst: str = "zh-Hans"
-    pages: List[Page] = field(default_factory=list)
-    outline: List[Dict[str, Any]] = field(default_factory=list)
-    assets: Dict[str, str] = field(default_factory=dict)
-    meta: Dict[str, Any] = field(default_factory=dict)
+    pages: list[Page] = field(default_factory=list)
+    outline: list[dict[str, Any]] = field(default_factory=list)
+    assets: dict[str, str] = field(default_factory=dict)
+    meta: dict[str, Any] = field(default_factory=dict)
     version: str = DOCIR_VERSION
     created_at: float = field(default_factory=time.time)
 
@@ -320,10 +321,9 @@ class DocIR:
     def iter_blocks(self) -> Iterable[Block]:
         """跨页迭代全部块（生成器，不额外占内存）。"""
         for p in self.pages:
-            for b in p.blocks:
-                yield b
+            yield from p.blocks
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "doc_id": self.doc_id,
             "source_path": self.source_path,
@@ -340,7 +340,7 @@ class DocIR:
         }
 
     @classmethod
-    def from_dict(cls, d: Dict[str, Any]) -> "DocIR":
+    def from_dict(cls, d: dict[str, Any]) -> DocIR:
         return cls(
             doc_id=d.get("doc_id", uuid.uuid4().hex[:16]),
             source_path=d.get("source_path", ""),

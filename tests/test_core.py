@@ -10,7 +10,7 @@ from linguaforge.translate.translator import build_payload, parse_translations
 # ---------------- DocIR ----------------
 def test_block_translatable_rules():
     assert Block(text="Hello world").is_translatable
-    assert not Block(text="42.7").is_translatable          # 纯数字
+    assert not Block(text="42.7").is_translatable  # 纯数字
     assert not Block(text="").is_translatable
     assert not Block(text="图 3", type=BlockType.PAGE_NUMBER).is_translatable
 
@@ -24,10 +24,17 @@ def test_block_out_text():
 def test_docir_roundtrip():
     doc = DocIR(source_path="a.pdf", source_format="pdf", title="T", lang_dst="zh-Hans")
     p = Page(index=0, width=595, height=842)
-    b = Block(text="Hello", type=BlockType.HEADING, bbox=(1.0, 2.0, 3.0, 4.0),
-              runs=[Run(text="Hello", font="Arial-Bold", size=18, bold=True)],
-              style=Style(size=18, bold=True, level=2), state=BlockState.TRANSLATED,
-              origin=Origin.OCR, confidence=0.9, translated="你好")
+    b = Block(
+        text="Hello",
+        type=BlockType.HEADING,
+        bbox=(1.0, 2.0, 3.0, 4.0),
+        runs=[Run(text="Hello", font="Arial-Bold", size=18, bold=True)],
+        style=Style(size=18, bold=True, level=2),
+        state=BlockState.TRANSLATED,
+        origin=Origin.OCR,
+        confidence=0.9,
+        translated="你好",
+    )
     p.blocks.append(b)
     doc.pages.append(p)
 

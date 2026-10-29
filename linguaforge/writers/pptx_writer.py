@@ -99,9 +99,7 @@ def write_all(
 
 
 # ---------------- 内部实现 ----------------
-def _add_slide(
-    prs: Any, page: Page, bilingual: bool, state: dict, digest: list[str]
-) -> None:
+def _add_slide(prs: Any, page: Page, bilingual: bool, state: dict, digest: list[str]) -> None:
     blocks = [b for b in page.blocks_sorted if b.type not in _SKIP]
     if not blocks:
         return

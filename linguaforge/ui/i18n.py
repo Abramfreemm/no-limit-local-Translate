@@ -179,7 +179,7 @@ _EN: dict[str, str] = {
     "task.browse": "Browse…",
     "task.drop": "Drop files here (PDF / Office / text / image)",
     "task.fmt_warn_pdf": "PDF output rewrites the source in place and only accepts PDF input; "
-                         "non-PDF files in the queue fall back to Markdown.",
+    "non-PDF files in the queue fall back to Markdown.",
     "task.fmt_unknown": "Unknown output format; falling back to Markdown.",
     "task.unsupported": "Not supported by kernel yet",
     "task.hint_unsupported": "Queued, but the kernel has no parser for this format yet: {ext}",
@@ -269,8 +269,8 @@ _EN: dict[str, str] = {
     # ---- 提示 ----
     "msg.ollama_title": "Ollama unavailable",
     "msg.ollama_body": "Cannot start translation:\n{problems}\n\n"
-                       "Make sure Ollama is running, the host is correct, "
-                       "and the selected model has been pulled.",
+    "Make sure Ollama is running, the host is correct, "
+    "and the selected model has been pulled.",
     "msg.goto_model": "Jump to the Models page to fix it?",
     "msg.no_file": "Please add at least one file first.",
     "msg.all_done": "All finished: {ok} succeeded, {fail} failed",
@@ -280,7 +280,7 @@ _EN: dict[str, str] = {
     "msg.info": "Information",
     "msg.confirm_clear": "Clear the whole queue?",
     "msg.file_filter": "Supported files (*.pdf *.docx *.pptx *.xlsx *.txt *.md *.html *.srt *.vtt "
-                       "*.png *.jpg *.jpeg *.tif *.tiff *.bmp *.webp);;All files (*.*)",
+    "*.png *.jpg *.jpeg *.tif *.tiff *.bmp *.webp);;All files (*.*)",
     "msg.csv_filter": "CSV files (*.csv);;All files (*.*)",
     "log.start": "Start: {name}",
     "log.done": "Done: {name} ({elapsed:.1f}s, {blocks} blocks / {translated} translated)",

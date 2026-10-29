@@ -8,7 +8,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, List, Optional, Tuple
+from typing import TYPE_CHECKING
 
 from .core.config import Config
 from .core.docir import Block, BlockState, BlockType, Origin, Page, Style
@@ -24,7 +24,7 @@ class OCRError(RuntimeError):
 class RapidOCREngine:
     """RapidOCR（ONNX）封装。"""
 
-    def __init__(self, config: Optional[Config] = None) -> None:
+    def __init__(self, config: Config | None = None) -> None:
         self.cfg = config or Config()
         self._engine = None
         self._loaded = False
@@ -49,7 +49,9 @@ class RapidOCREngine:
             return False
 
     # ---------- 识别 ----------
-    def ocr_image(self, image: "Image.Image") -> List[Tuple[str, Tuple[float, float, float, float], float]]:
+    def ocr_image(
+        self, image: Image.Image
+    ) -> list[tuple[str, tuple[float, float, float, float], float]]:
         """返回 [(text, bbox_px, confidence)]，bbox_px = (x0, y0, x1, y1)。"""
         self.load()
         if self._engine is None:
@@ -62,7 +64,7 @@ class RapidOCREngine:
             result, _ = self._engine(arr)
         except Exception as e:  # noqa: BLE001
             raise OCRError(f"OCR 失败：{e}") from e
-        out: List[Tuple[str, Tuple[float, float, float, float], float]] = []
+        out: list[tuple[str, tuple[float, float, float, float], float]] = []
         if not result:
             return out
         for item in result:
@@ -80,7 +82,7 @@ class RapidOCREngine:
         return out
 
     # ---------- 回填 Page ----------
-    def fill_page(self, page: Page, image: "Image.Image", dpi: Optional[int] = None) -> int:
+    def fill_page(self, page: Page, image: Image.Image, dpi: int | None = None) -> int:
         """用 OCR 结果重建 page.blocks。返回写入的块数。"""
         dpi = dpi or self.cfg.ocr.dpi
         scale = 72.0 / float(dpi)  # 像素 -> PDF point
@@ -90,7 +92,7 @@ class RapidOCREngine:
 
         # 按 y 排序后做行聚类（OCR 已分行，此处合并同一行的多个片段）
         lines.sort(key=lambda t: (round(t[1][1] / 8), t[1][0]))
-        rows: List[List[Tuple[str, Tuple[float, float, float, float], float]]] = []
+        rows: list[list[tuple[str, tuple[float, float, float, float], float]]] = []
         for ln in lines:
             if not rows:
                 rows.append([ln])
@@ -104,10 +106,10 @@ class RapidOCREngine:
                 rows.append([ln])
         rows.sort(key=lambda r: (round(r[0][1][1] / 8), r[0][1][0]))
 
-        blocks: List[Block] = []
+        blocks: list[Block] = []
         for i, row in enumerate(rows):
             row.sort(key=lambda t: t[1][0])
-            texts: List[str] = []
+            texts: list[str] = []
             for j, (text, bbox, _score) in enumerate(row):
                 if j and texts:
                     prev_right = row[j - 1][1][2]

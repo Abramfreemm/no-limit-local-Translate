@@ -36,10 +36,10 @@ class XlsxParseError(RuntimeError):
 class XlsxParser:
     """解析 .xlsx / .xlsm。用法：
 
-        with XlsxParser(cfg) as p:
-            p.open(path)
-            for page in p.iter_pages():
-                ...
+    with XlsxParser(cfg) as p:
+        p.open(path)
+        for page in p.iter_pages():
+            ...
     """
 
     extensions: set = {".xlsx", ".xlsm"}
@@ -67,9 +67,7 @@ class XlsxParser:
         try:
             self._wb = load_workbook(filename=str(p), data_only=True)
         except Exception as e:
-            raise XlsxParseError(
-                f"无法打开 XLSX：{p.name}（文件损坏或不是合法工作簿）: {e}"
-            ) from e
+            raise XlsxParseError(f"无法打开 XLSX：{p.name}（文件损坏或不是合法工作簿）: {e}") from e
         self.path = str(p)
         try:
             self._sheets = list(self._wb.sheetnames)

@@ -36,16 +36,12 @@ ROOT = Path(__file__).resolve().parent.parent
 # 拿 OTF 去注册会直接失败、导致回填出的 PDF 没有中文。
 # google/fonts 里的 NotoSansSC[wght].ttf 是可变 TTF，下面再实例化成静态字重。
 NOTO_SC_URL = (
-    "https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/notosanssc/"
-    "NotoSansSC%5Bwght%5D.ttf"
+    "https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/notosanssc/NotoSansSC%5Bwght%5D.ttf"
 )
 NOTO_SC_URL_GITHUB = (
-    "https://github.com/google/fonts/raw/main/ofl/notosanssc/"
-    "NotoSansSC%5Bwght%5D.ttf"
+    "https://github.com/google/fonts/raw/main/ofl/notosanssc/NotoSansSC%5Bwght%5D.ttf"
 )
-NOTO_LICENSE_URL = (
-    "https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/notosanssc/OFL.txt"
-)
+NOTO_LICENSE_URL = "https://cdn.jsdelivr.net/gh/google/fonts@main/ofl/notosanssc/OFL.txt"
 
 
 def http_get(url: str, dest: Path, timeout: int = 60) -> bool:
@@ -85,7 +81,7 @@ def instantiate_static(src: Path, out_dir: Path) -> int:
             )
             inst.save(str(dest))
             n += 1
-            print(f"   实例化 {name} ({dest.stat().st_size/1e6:.1f} MB)")
+            print(f"   实例化 {name} ({dest.stat().st_size / 1e6:.1f} MB)")
         except Exception as exc:  # noqa: BLE001
             print(f"   [失败] {name}: {type(exc).__name__}: {exc}")
     return n
@@ -103,7 +99,7 @@ def prepare_fonts(out: Path, skip: bool) -> None:
             if not http_get(NOTO_SC_URL_GITHUB, variable):
                 print("[字体] ⚠️ 下载失败。构建可继续，但 CJK 输出需手动放入字体。")
                 return
-        print(f"   已保存 {variable.name}  ({variable.stat().st_size/1e6:.1f} MB)")
+        print(f"   已保存 {variable.name}  ({variable.stat().st_size / 1e6:.1f} MB)")
     elif skip:
         print("[字体] 按参数跳过下载")
 
@@ -221,8 +217,10 @@ def dump_licenses(out: Path) -> None:
         fh.write(header.rstrip() + "\n")
         fh.write("\n".join(build) + "\n\n")
         fh.write("本软件自身采用 Apache-2.0 许可，详见随包的 LICENSE 文件。\n")
-        fh.write("中文字体 Noto Sans SC 采用 SIL Open Font License 1.1，"
-                 "许可全文见 resources/fonts/OFL.txt。\n")
+        fh.write(
+            "中文字体 Noto Sans SC 采用 SIL Open Font License 1.1，"
+            "许可全文见 resources/fonts/OFL.txt。\n"
+        )
     raw.unlink(missing_ok=True)
     print(f"[许可] 第三方清单 → {dest}（运行时 {len(runtime)} / 构建期 {len(build)}）")
 

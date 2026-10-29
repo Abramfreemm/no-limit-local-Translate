@@ -14,7 +14,6 @@ from __future__ import annotations
 import platform
 import sys
 from pathlib import Path
-from typing import List, Optional, Tuple
 
 _REGISTERED: dict = {}
 
@@ -30,7 +29,7 @@ def bundled_fonts_dir() -> Path:
     return app_base_dir() / "resources" / "fonts"
 
 
-def _system_candidates() -> List[Tuple[Path, int]]:
+def _system_candidates() -> list[tuple[Path, int]]:
     """本机字体候选（path, subfontIndex）。只在未随包时兜底使用。"""
     home = Path.home()
     sysname = platform.system()
@@ -58,7 +57,7 @@ def _system_candidates() -> List[Tuple[Path, int]]:
     ]
 
 
-def _bundled_candidates() -> List[Tuple[Path, int]]:
+def _bundled_candidates() -> list[tuple[Path, int]]:
     d = bundled_fonts_dir()
     return [
         (d / "NotoSansSC-Regular.ttf", 0),
@@ -68,7 +67,7 @@ def _bundled_candidates() -> List[Tuple[Path, int]]:
     ]
 
 
-def ensure_body_font(prefer_bundled: bool = True) -> Optional[str]:
+def ensure_body_font(prefer_bundled: bool = True) -> str | None:
     """注册正文用中文字体，返回 reportlab 字体名；全部失败返回 None。"""
     if "body" in _REGISTERED:
         return _REGISTERED["body"]
@@ -95,7 +94,7 @@ def ensure_body_font(prefer_bundled: bool = True) -> Optional[str]:
     return None
 
 
-def ensure_bold_font(prefer_bundled: bool = True) -> Optional[str]:
+def ensure_bold_font(prefer_bundled: bool = True) -> str | None:
     """注册粗体中文字体。失败返回 None —— 调用方改用加描边的伪粗体。"""
     if "bold" in _REGISTERED:
         return _REGISTERED["bold"]
@@ -103,7 +102,7 @@ def ensure_bold_font(prefer_bundled: bool = True) -> Optional[str]:
     from reportlab.pdfbase import pdfmetrics
     from reportlab.pdfbase.ttfonts import TTFont
 
-    order: List[Tuple[Path, int]] = []
+    order: list[tuple[Path, int]] = []
     d = bundled_fonts_dir()
     order += [(d / "NotoSansSC-Bold.ttf", 0)]
     if platform.system() == "Windows":

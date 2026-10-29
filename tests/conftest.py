@@ -32,10 +32,16 @@ def sample_pdf(tmp_path_factory) -> Path:
         story.append(Paragraph(s, styles["BodyText"]))
         story.append(Spacer(1, 3 * mm))
     story.append(Paragraph("1. Measurement Setup", styles["Heading2"]))
-    story.append(Paragraph("Record the ambient temperature before measurement.", styles["BodyText"]))
+    story.append(
+        Paragraph("Record the ambient temperature before measurement.", styles["BodyText"])
+    )
     story.append(Spacer(1, 4 * mm))
     tbl = Table(
-        [["Parameter", "Value", "Unit"], ["Thermal efficiency", "42.7", "%"], ["Rated power", "3.2", "kW"]],
+        [
+            ["Parameter", "Value", "Unit"],
+            ["Thermal efficiency", "42.7", "%"],
+            ["Rated power", "3.2", "kW"],
+        ],
         colWidths=[55 * mm, 35 * mm, 25 * mm],
     )
     tbl.setStyle([("GRID", (0, 0), (-1, -1), 0.5, colors.black)])
@@ -47,8 +53,13 @@ def sample_pdf(tmp_path_factory) -> Path:
             story.append(Paragraph(s, styles["BodyText"]))
             story.append(Spacer(1, 3 * mm))
     doc = SimpleDocTemplate(
-        str(out), pagesize=A4, leftMargin=20 * mm, rightMargin=20 * mm,
-        topMargin=18 * mm, bottomMargin=18 * mm, title="Thermal Performance",
+        str(out),
+        pagesize=A4,
+        leftMargin=20 * mm,
+        rightMargin=20 * mm,
+        topMargin=18 * mm,
+        bottomMargin=18 * mm,
+        title="Thermal Performance",
     )
     doc.build(story)
     return out

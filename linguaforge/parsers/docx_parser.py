@@ -63,10 +63,10 @@ class DocxParseError(RuntimeError):
 class DocxParser:
     """解析 .docx。用法：
 
-        with DocxParser(cfg) as p:
-            p.open(path)
-            for page in p.iter_pages():
-                ...
+    with DocxParser(cfg) as p:
+        p.open(path)
+        for page in p.iter_pages():
+            ...
     """
 
     extensions: set = {".docx"}

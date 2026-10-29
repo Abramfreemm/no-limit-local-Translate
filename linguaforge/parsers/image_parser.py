@@ -30,12 +30,12 @@ class ImageParseError(RuntimeError):
 class ImageParser:
     """解析 .png / .jpg / .jpeg / .tif / .tiff / .bmp / .webp。用法：
 
-        with ImageParser(cfg) as p:
-            p.open(path)
-            for page in p.iter_pages():
-                if page.meta.get("need_ocr"):
-                    img = load_image(page)
-                    ocr.fill_page(page, img, dpi)
+    with ImageParser(cfg) as p:
+        p.open(path)
+        for page in p.iter_pages():
+            if page.meta.get("need_ocr"):
+                img = load_image(page)
+                ocr.fill_page(page, img, dpi)
     """
 
     extensions: set = {".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp", ".webp"}
@@ -71,9 +71,7 @@ class ImageParser:
         except ImportError as e:
             raise ImageParseError(f"缺少 Pillow，无法读取图片：{e}") from e
         except Exception as e:
-            raise ImageParseError(
-                f"无法读取图片：{p.name}（文件损坏或格式不受支持）: {e}"
-            ) from e
+            raise ImageParseError(f"无法读取图片：{p.name}（文件损坏或格式不受支持）: {e}") from e
         if self._px[0] <= 0 or self._px[1] <= 0:
             raise ImageParseError(f"图片尺寸非法：{p.name} -> {self._px}")
 

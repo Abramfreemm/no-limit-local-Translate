@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Dict, List, Sequence
 
 from ..core.docir import Block, BlockType, DocIR, Page
 
@@ -33,7 +33,7 @@ def render_pages(
     include_skipped: bool = False,
 ) -> str:
     """渲染一批页面。流水线按窗口流式调用它，避免整篇驻留内存。"""
-    out: List[str] = []
+    out: list[str] = []
     if title:
         out.append(f"# {title}")
         out.append("")
@@ -43,7 +43,7 @@ def render_pages(
         if not blocks:
             continue
         # 表格按 table_id 聚合
-        tables: Dict[str, List[Block]] = {}
+        tables: dict[str, list[Block]] = {}
         for b in blocks:
             if b.type is BlockType.TABLE_CELL and b.table_id:
                 tables.setdefault(b.table_id, []).append(b)
@@ -110,17 +110,23 @@ def render_pages(
     return text.strip() + "\n"
 
 
-def _render_table(cells: List[Block], bilingual: bool) -> List[str]:
+def _render_table(cells: list[Block], bilingual: bool) -> list[str]:
     if not cells:
         return []
-    rows: Dict[int, Dict[int, Block]] = {}
+    rows: dict[int, dict[int, Block]] = {}
     for c in cells:
         rows.setdefault(c.row, {})[c.col] = c
     max_col = max((max(r.keys()) for r in rows.values() if r), default=0)
-    out: List[str] = []
+    out: list[str] = []
     for ri in sorted(rows.keys()):
         row = rows[ri]
-        line = "| " + " | ".join(_escape_cell(row.get(ci, Block()).out_text.strip()) for ci in range(max_col + 1)) + " |"
+        line = (
+            "| "
+            + " | ".join(
+                _escape_cell(row.get(ci, Block()).out_text.strip()) for ci in range(max_col + 1)
+            )
+            + " |"
+        )
         out.append(line)
         if ri == sorted(rows.keys())[0]:
             out.append("|" + "---|" * (max_col + 1))

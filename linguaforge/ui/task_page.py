@@ -97,7 +97,13 @@ class TaskPage(QWidget):
         self.btn_clear = QPushButton()
         self.btn_preview = QPushButton()
         self.btn_open_out = QPushButton()
-        for b in (self.btn_add, self.btn_remove, self.btn_clear, self.btn_preview, self.btn_open_out):
+        for b in (
+            self.btn_add,
+            self.btn_remove,
+            self.btn_clear,
+            self.btn_preview,
+            self.btn_open_out,
+        ):
             bar.addWidget(b)
         bar.addStretch(1)
         root.addLayout(bar)
@@ -196,8 +202,10 @@ class TaskPage(QWidget):
             if is_input_ext(p):
                 paths.append(p)
             else:
-                self._warn(tr("msg.warning", self.lang_code),
-                           tr("task.hint_unsupported", self.lang_code, ext=Path(p).suffix))
+                self._warn(
+                    tr("msg.warning", self.lang_code),
+                    tr("task.hint_unsupported", self.lang_code, ext=Path(p).suffix),
+                )
         if paths:
             self.add_paths(paths)
         event.setDropAction(Qt.DropAction.CopyAction)
@@ -329,8 +337,9 @@ class TaskPage(QWidget):
         if not item.output or not Path(item.output).exists():
             self._warn(tr("msg.info", self.lang_code), tr("task.not_done", self.lang_code))
             return
-        dlg = PreviewDialog(str(item.path), item.output, self.cmb_fmt.currentText(),
-                            self.lang_code, self)
+        dlg = PreviewDialog(
+            str(item.path), item.output, self.cmb_fmt.currentText(), self.lang_code, self
+        )
         self._preview = dlg
         dlg.load()
         dlg.exec()
@@ -343,8 +352,7 @@ class TaskPage(QWidget):
         """
         warn = ""
         if text == "pdf":
-            non_pdf = [it for it in self._rows.values()
-                       if it.path.suffix.lower() != ".pdf"]
+            non_pdf = [it for it in self._rows.values() if it.path.suffix.lower() != ".pdf"]
             if non_pdf:
                 warn = tr("task.fmt_warn_pdf", self.lang_code)
         elif text not in KERNEL_OUTPUT_FMTS:
@@ -356,9 +364,12 @@ class TaskPage(QWidget):
     def _on_start(self) -> None:
         if self._worker is not None and self._worker.isRunning():
             return
-        items = [(row, str(it.path)) for row, it in self._rows.items()
-                 if it.status in (_PENDING, _FAILED, _CANCELED)
-                 and it.path.suffix.lower() in KERNEL_INPUT_EXTS]
+        items = [
+            (row, str(it.path))
+            for row, it in self._rows.items()
+            if it.status in (_PENDING, _FAILED, _CANCELED)
+            and it.path.suffix.lower() in KERNEL_INPUT_EXTS
+        ]
         if not items:
             self._warn(tr("msg.info", self.lang_code), tr("msg.no_file", self.lang_code))
             return
@@ -372,7 +383,9 @@ class TaskPage(QWidget):
         cfg = copy.deepcopy(self.cfg)
         fmt = self.cmb_fmt.currentText()
         worker = TranslateWorker(
-            cfg, items, fmt=fmt,
+            cfg,
+            items,
+            fmt=fmt,
             bilingual=self.chk_bilingual.isChecked(),
             out_dir=self.edt_out.text().strip() or None,
             parent=self,
@@ -458,12 +471,16 @@ class TaskPage(QWidget):
         item.message = ""
         item.output = str(getattr(result, "output", "") or "")
         self._refresh_row_text(row)
-        self._log_line(tr(
-            "log.done", self.lang_code, name=item.path.name,
-            elapsed=float(getattr(result, "elapsed_s", 0.0) or 0.0),
-            blocks=int(getattr(result, "blocks", 0) or 0),
-            translated=int(getattr(result, "translated", 0) or 0),
-        ))
+        self._log_line(
+            tr(
+                "log.done",
+                self.lang_code,
+                name=item.path.name,
+                elapsed=float(getattr(result, "elapsed_s", 0.0) or 0.0),
+                blocks=int(getattr(result, "blocks", 0) or 0),
+                translated=int(getattr(result, "translated", 0) or 0),
+            )
+        )
         self._log_line(str(getattr(result, "summary", lambda: "")()))
 
     def _on_item_error(self, row: int, message: str) -> None:
@@ -547,12 +564,14 @@ class TaskPage(QWidget):
         self.chk_bilingual.setText(tr("task.bilingual", lang))
         self.lbl_out.setText(tr("task.outdir", lang))
         self.lbl_hint.setText(tr("task.drop", lang))
-        self.table.setHorizontalHeaderLabels([
-            tr("task.col_file", lang),
-            tr("task.col_format", lang),
-            tr("task.col_status", lang),
-            tr("task.col_progress", lang),
-        ])
+        self.table.setHorizontalHeaderLabels(
+            [
+                tr("task.col_file", lang),
+                tr("task.col_format", lang),
+                tr("task.col_status", lang),
+                tr("task.col_progress", lang),
+            ]
+        )
         self._on_fmt_changed(self.cmb_fmt.currentText())
         for row in self._rows:
             self._refresh_row_text(row)

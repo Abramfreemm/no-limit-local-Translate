@@ -131,8 +131,9 @@ class ModelPage(QWidget):
         lang = self.lang_code
         self.lbl_status.setText(tr("model.probing", lang))
         self.btn_refresh.setEnabled(False)
-        worker = OllamaProbeWorker(self.edt_host.text().strip() or self.cfg.ollama.host,
-                                   timeout=10.0, parent=self)
+        worker = OllamaProbeWorker(
+            self.edt_host.text().strip() or self.cfg.ollama.host, timeout=10.0, parent=self
+        )
         worker.sig_done.connect(self._on_probe_done)
         worker.finished.connect(worker.deleteLater)
         self._probe = worker
@@ -169,8 +170,13 @@ class ModelPage(QWidget):
             self._set(idx, 0, name)
             self._set(idx, 1, str(details.get("parameter_size") or tr("model.unknown", lang)))
             self._set(idx, 2, str(details.get("quantization_level") or tr("model.unknown", lang)))
-            self._set(idx, 3, tr("model.size_gb", lang, size=size / (1024 ** 3)) if size
-                      else tr("model.unknown", lang))
+            self._set(
+                idx,
+                3,
+                tr("model.size_gb", lang, size=size / (1024**3))
+                if size
+                else tr("model.unknown", lang),
+            )
             self._set(idx, 4, tr("model.installed", lang))
 
     def _set(self, row: int, col: int, text: str) -> None:
@@ -231,7 +237,7 @@ class ModelPage(QWidget):
 
     def _on_pull_progress(self, status: str, pct: float) -> None:
         if pct < 0:
-            self.bar_pull.setRange(0, 0)          # 不确定进度：走忙碌动画
+            self.bar_pull.setRange(0, 0)  # 不确定进度：走忙碌动画
             self.bar_pull.setFormat(status or tr("model.pulling", self.lang_code))
         else:
             self.bar_pull.setRange(0, 100)
@@ -276,12 +282,14 @@ class ModelPage(QWidget):
         self.lbl_pull_name.setText(tr("model.pull_name", lang))
         self.btn_pull.setText(tr("model.pull", lang))
         self.btn_pull_cancel.setText(tr("model.pull_cancel", lang))
-        self.table.setHorizontalHeaderLabels([
-            tr("model.col_name", lang),
-            tr("model.col_params", lang),
-            tr("model.col_quant", lang),
-            tr("model.col_size", lang),
-            tr("model.col_status", lang),
-        ])
+        self.table.setHorizontalHeaderLabels(
+            [
+                tr("model.col_name", lang),
+                tr("model.col_params", lang),
+                tr("model.col_quant", lang),
+                tr("model.col_size", lang),
+                tr("model.col_status", lang),
+            ]
+        )
         if not self._probed:
             self.lbl_status.setText(tr("model.status", lang))

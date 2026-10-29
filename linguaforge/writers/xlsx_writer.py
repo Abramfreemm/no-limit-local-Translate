@@ -32,7 +32,7 @@ from ..core.docir import Block, BlockType, Page
 _SKIP = {BlockType.HEADER, BlockType.FOOTER, BlockType.PAGE_NUMBER}
 _MAX_SHEET_NAME = 31
 _MAX_COL_WIDTH = 60.0
-_INVALID_CHARS = '[]:*?/\\'
+_INVALID_CHARS = "[]:*?/\\"
 
 
 def render_pages(

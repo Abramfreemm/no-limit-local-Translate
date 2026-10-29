@@ -40,10 +40,10 @@ class HtmlParseError(RuntimeError):
 class HtmlParser:
     """解析 .html / .htm / .xhtml / .md / .markdown。用法：
 
-        with HtmlParser(cfg) as p:
-            p.open(path)
-            for page in p.iter_pages():
-                ...
+    with HtmlParser(cfg) as p:
+        p.open(path)
+        for page in p.iter_pages():
+            ...
     """
 
     extensions: set = {".html", ".htm", ".xhtml", ".md", ".markdown"}
@@ -64,7 +64,9 @@ class HtmlParser:
         if not p.exists():
             raise FileNotFoundError(f"文件不存在: {p}")
         if not self.supports(p):
-            raise HtmlParseError(f"HtmlParser 不支持扩展名 {p.suffix or '(无)'}，仅支持 {sorted(self.extensions)}")
+            raise HtmlParseError(
+                f"HtmlParser 不支持扩展名 {p.suffix or '(无)'}，仅支持 {sorted(self.extensions)}"
+            )
         try:
             raw = p.read_text(encoding="utf-8", errors="replace")
         except OSError as e:
@@ -508,6 +510,6 @@ def _md_to_html(md: str) -> str:
         out.append("<pre><code>" + _esc("\n".join(code_buf)) + "</code></pre>")
     flush_all()
     return (
-        "<!DOCTYPE html><html><head><meta charset=\"utf-8\"><title></title></head>"
+        '<!DOCTYPE html><html><head><meta charset="utf-8"><title></title></head>'
         "<body>" + "\n".join(out) + "</body></html>"
     )

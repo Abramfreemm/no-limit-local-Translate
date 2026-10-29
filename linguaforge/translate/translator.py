@@ -18,8 +18,8 @@ from __future__ import annotations
 import json
 import re
 import time
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
-from typing import Callable, Dict, List, Optional, Sequence, Tuple
 
 from ..core.config import Config, lang_name
 from ..core.docir import Block, BlockState
@@ -55,7 +55,7 @@ class TranslateStats:
     tm_hits: int = 0
     requests: int = 0
     retries: int = 0
-    degrade_events: List[str] = field(default_factory=list)
+    degrade_events: list[str] = field(default_factory=list)
     elapsed_s: float = 0.0
     model_used: str = ""
 
@@ -67,15 +67,17 @@ class TranslateStats:
 class Glossary:
     """术语表：src -> dst。按批次挑选相关条目注入 prompt。"""
 
-    def __init__(self, entries: Optional[Sequence[Tuple[str, str]]] = None, case_sensitive: bool = False) -> None:
+    def __init__(
+        self, entries: Sequence[tuple[str, str]] | None = None, case_sensitive: bool = False
+    ) -> None:
         self.case_sensitive = case_sensitive
-        self._map: Dict[str, str] = {}
+        self._map: dict[str, str] = {}
         for s, d in entries or []:
             if s and d:
                 self._map[s if case_sensitive else s.lower()] = d
 
     @classmethod
-    def from_file(cls, path: str, case_sensitive: bool = False) -> "Glossary":
+    def from_file(cls, path: str, case_sensitive: bool = False) -> Glossary:
         """支持 CSV/TSV/JSON。CSV 形如 `src,dst` 或 `src\\tdst`。"""
         import os
 
@@ -83,7 +85,7 @@ class Glossary:
         if not path or not os.path.exists(path):
             return g
         try:
-            text = open(path, "r", encoding="utf-8-sig").read()
+            text = open(path, encoding="utf-8-sig").read()
         except Exception:
             return g
         ext = os.path.splitext(path)[1].lower()
@@ -93,7 +95,9 @@ class Glossary:
                 if isinstance(obj, dict):
                     return cls(list(obj.items()), case_sensitive)
                 if isinstance(obj, list):
-                    pairs = [(i.get("src", ""), i.get("dst", "")) for i in obj if isinstance(i, dict)]
+                    pairs = [
+                        (i.get("src", ""), i.get("dst", "")) for i in obj if isinstance(i, dict)
+                    ]
                     return cls(pairs, case_sensitive)
             except Exception:
                 return g
@@ -113,13 +117,13 @@ class Glossary:
     def __len__(self) -> int:
         return len(self._map)
 
-    def select(self, texts: Sequence[str], limit: int = 40) -> List[Dict[str, str]]:
+    def select(self, texts: Sequence[str], limit: int = 40) -> list[dict[str, str]]:
         """挑出与当前批次文本相关的术语，控制 prompt 体积。"""
         if not self._map:
             return []
         blob = "\n".join(texts)
         hay = blob if self.case_sensitive else blob.lower()
-        hits: List[Tuple[int, str, str]] = []
+        hits: list[tuple[int, str, str]] = []
         for k, v in self._map.items():
             pos = hay.find(k)
             if pos >= 0:
@@ -132,9 +136,9 @@ class TranslationMemory:
     """翻译记忆：精确命中直接复用，省 token 且保证术语一致。"""
 
     def __init__(self) -> None:
-        self._m: Dict[str, str] = {}
+        self._m: dict[str, str] = {}
 
-    def get(self, text: str) -> Optional[str]:
+    def get(self, text: str) -> str | None:
         return self._m.get(text.strip())
 
     def put(self, text: str, translated: str) -> None:
@@ -147,7 +151,7 @@ class TranslationMemory:
 
     def load_json(self, path: str) -> None:
         try:
-            d = json.loads(open(path, "r", encoding="utf-8").read())
+            d = json.loads(open(path, encoding="utf-8").read())
             if isinstance(d, dict):
                 self._m.update({str(k): str(v) for k, v in d.items()})
         except Exception:
@@ -165,11 +169,11 @@ def build_payload(
     texts: Sequence[str],
     lang_src: str,
     lang_dst: str,
-    glossary: Optional[List[Dict[str, str]]] = None,
+    glossary: list[dict[str, str]] | None = None,
 ) -> str:
     """构造编号化批量请求体。"""
     items = [{"id": i + 1, "text": t} for i, t in enumerate(texts)]
-    obj: Dict[str, object] = {
+    obj: dict[str, object] = {
         "task": f"Translate each item from {lang_name(lang_src)} to {lang_name(lang_dst)}.",
         "items": items,
         "output": (
@@ -191,7 +195,7 @@ def _strip_fence(raw: str) -> str:
     return s.strip()
 
 
-def parse_translations(raw: str, n: int) -> List[str]:
+def parse_translations(raw: str, n: int) -> list[str]:
     """三级解析，尽可能从模型输出里救回对齐结果。"""
     out = [""] * n
     if not raw or not n:
@@ -250,7 +254,7 @@ def parse_translations(raw: str, n: int) -> List[str]:
                 pass
 
     # L3：正则抽 id/text 对
-    pairs: List[Tuple[int, str]] = []
+    pairs: list[tuple[int, str]] = []
     for sid, txt in _PAIR_ID_TEXT.findall(s):
         try:
             pairs.append((int(sid), txt))
@@ -271,10 +275,10 @@ def parse_translations(raw: str, n: int) -> List[str]:
             return out
 
     # L4：编号行 "1. 译文"（模型完全无视 JSON 时的兜底）
-    lines = [l for l in s.splitlines() if l.strip()]
+    lines = [ln for ln in s.splitlines() if ln.strip()]
     idxs = []
-    for l in lines:
-        m = _LINE_NUM.match(l)
+    for ln in lines:
+        m = _LINE_NUM.match(ln)
         idxs.append((int(m.group(1)), m.group(2).strip()) if m else None)
     if sum(1 for x in idxs if x) >= max(1, n // 2):
         for item in idxs:
@@ -293,11 +297,11 @@ class Translator:
 
     def __init__(
         self,
-        cfg: Optional[Config] = None,
-        client: Optional[OllamaClient] = None,
-        glossary: Optional[Glossary] = None,
-        tm: Optional[TranslationMemory] = None,
-        log: Optional[Callable[[str], None]] = None,
+        cfg: Config | None = None,
+        client: OllamaClient | None = None,
+        glossary: Glossary | None = None,
+        tm: TranslationMemory | None = None,
+        log: Callable[[str], None] | None = None,
     ) -> None:
         self.cfg = cfg or Config()
         self.client = client or OllamaClient(self.cfg.ollama.host, self.cfg.ollama.timeout_s)
@@ -305,14 +309,14 @@ class Translator:
         self.tm = tm or TranslationMemory()
         self.log = log or (lambda _m: None)
         self.stats = TranslateStats()
-        self._cancel: Optional[Callable[[], bool]] = None
+        self._cancel: Callable[[], bool] | None = None
 
     # ---------- 对外主入口 ----------
     def translate_blocks(
         self,
         blocks: Sequence[Block],
-        cancel: Optional[Callable[[], bool]] = None,
-        on_batch: Optional[Callable[[int, int], None]] = None,
+        cancel: Callable[[], bool] | None = None,
+        on_batch: Callable[[int, int], None] | None = None,
     ) -> TranslateStats:
         self._cancel = cancel
         self.stats = TranslateStats(total_blocks=len(blocks))
@@ -343,7 +347,7 @@ class Translator:
     # ---------- 批次 ----------
     def _translate_batch(self, batch: Sequence[Block]) -> None:
         # TM 命中先行
-        pending: List[Block] = []
+        pending: list[Block] = []
         for b in batch:
             hit = self.tm.get(b.text) if self.cfg.tm.enabled else None
             if hit:
@@ -364,7 +368,7 @@ class Translator:
         payload = build_payload(texts, self.cfg.lang_src, self.cfg.lang_dst, gloss)
         results = self._attempt(pending, payload)
 
-        for b, t in zip(pending, results):
+        for b, t in zip(pending, results, strict=False):
             if t and t.strip():
                 b.translated = t.strip()
                 b.state = BlockState.TRANSLATED
@@ -374,7 +378,7 @@ class Translator:
                 b.state = BlockState.FAILED
 
     # ---------- 降级链 ----------
-    def _attempt(self, blocks: Sequence[Block], payload: str) -> List[str]:
+    def _attempt(self, blocks: Sequence[Block], payload: str) -> list[str]:
         n = len(blocks)
         oc = self.cfg.ollama
         options = {
@@ -422,7 +426,7 @@ class Translator:
 
         # L5：逐条翻译
         self.stats.degrade_events.append("one-by-one")
-        out: List[str] = []
+        out: list[str] = []
         for t in texts:
             p = build_payload([t], self.cfg.lang_src, self.cfg.lang_dst, [])
             raw = self._call(oc.model, p, options, False)
@@ -432,9 +436,11 @@ class Translator:
             out.append((r[0] if r else "").strip())
         return out
 
-    def _split_and_try(self, blocks: Sequence[Block], options: dict, model: Optional[str] = None) -> List[str]:
+    def _split_and_try(
+        self, blocks: Sequence[Block], options: dict, model: str | None = None
+    ) -> list[str]:
         mid = max(1, len(blocks) // 2)
-        out: List[str] = []
+        out: list[str] = []
         for part in (blocks[:mid], blocks[mid:]):
             if not part:
                 continue
@@ -468,7 +474,9 @@ class Translator:
                 return raw
             except OllamaError as e:
                 self.stats.retries += 1
-                self.log(f"[translate] 请求失败({attempt+1}/{self.cfg.ollama.max_retry+1}): {e}")
+                self.log(
+                    f"[translate] 请求失败({attempt + 1}/{self.cfg.ollama.max_retry + 1}): {e}"
+                )
                 time.sleep(1.5 * (attempt + 1))
             except Exception as e:  # noqa: BLE001
                 self.stats.retries += 1
@@ -482,13 +490,13 @@ def _aligned(res: Sequence[str], n: int) -> bool:
     return len(res) == n and all(x.strip() for x in res)
 
 
-def _repair_missing(raw: str, res: Sequence[str], n: int) -> List[str]:
+def _repair_missing(raw: str, res: Sequence[str], n: int) -> list[str]:
     """少数条目缺失时，用原文占位并尽力从 raw 再捞一次。"""
     out = list(res)[:n] + [""] * max(0, n - len(res))
     return out
 
 
-def blocks_batches(blocks: Sequence[Block], cfg: Config) -> List[List[Block]]:
+def blocks_batches(blocks: Sequence[Block], cfg: Config) -> list[list[Block]]:
     from ..core.chunker import Chunker
 
     ck = Chunker(cfg.ollama.batch_max_chars, cfg.ollama.batch_max_items)
@@ -497,11 +505,13 @@ def blocks_batches(blocks: Sequence[Block], cfg: Config) -> List[List[Block]]:
 
 def merge_sub_blocks(blocks: Sequence[Block]) -> None:
     """把 Chunker 切出的子块译文按顺序合并回父块。"""
-    parents: Dict[str, List[Tuple[int, str]]] = {}
+    parents: dict[str, list[tuple[int, str]]] = {}
     for b in blocks:
         pid = b.meta.get("parent_id")
         if pid:
-            parents.setdefault(pid, []).append((int(b.meta.get("sub_index", 0)), b.translated or b.text))
+            parents.setdefault(pid, []).append(
+                (int(b.meta.get("sub_index", 0)), b.translated or b.text)
+            )
     if not parents:
         return
     by_id = {b.id: b for b in blocks}

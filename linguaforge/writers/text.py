@@ -3,15 +3,14 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import List
 
 from ..core.docir import BlockType, DocIR, Page
 
 _SKIP = {BlockType.HEADER, BlockType.FOOTER, BlockType.PAGE_NUMBER}
 
 
-def render_page_text(page: Page, bilingual: bool = False) -> List[str]:
-    out: List[str] = []
+def render_page_text(page: Page, bilingual: bool = False) -> list[str]:
+    out: list[str] = []
     for b in page.blocks_sorted:
         if b.type in _SKIP:
             continue
@@ -35,7 +34,7 @@ def render_page_text(page: Page, bilingual: bool = False) -> List[str]:
 
 
 def render_text(doc: DocIR, bilingual: bool = False) -> str:
-    out: List[str] = []
+    out: list[str] = []
     if doc.title:
         out.append(doc.title)
         out.append("=" * min(60, max(8, len(doc.title))))

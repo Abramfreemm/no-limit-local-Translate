@@ -72,8 +72,14 @@ class GlossaryPage(QWidget):
         self.btn_reload = QPushButton()
         self.btn_import = QPushButton()
         self.btn_export = QPushButton()
-        for b in (self.btn_add, self.btn_delete, self.btn_save, self.btn_reload,
-                  self.btn_import, self.btn_export):
+        for b in (
+            self.btn_add,
+            self.btn_delete,
+            self.btn_save,
+            self.btn_reload,
+            self.btn_import,
+            self.btn_export,
+        ):
             bar.addWidget(b)
         bar.addStretch(1)
         root.addLayout(bar)
@@ -127,8 +133,12 @@ class GlossaryPage(QWidget):
         data = list(rows or [])  # type: ignore[arg-type]
         self.table.setRowCount(0)
         for r in data:
-            self._append_row(str(r.get("term", "")), str(r.get("translation", "")),
-                             str(r.get("note", "")), int(r.get("id", 0) or 0))
+            self._append_row(
+                str(r.get("term", "")),
+                str(r.get("translation", "")),
+                str(r.get("note", "")),
+                int(r.get("id", 0) or 0),
+            )
         self._status(tr("glossary.loaded", self.lang_code, n=len(data)))
         self._refresh_tm_stats()
 
@@ -161,8 +171,9 @@ class GlossaryPage(QWidget):
         self.table.selectRow(self.table.rowCount() - 1)
 
     def _on_delete(self) -> None:
-        for model_idx in sorted((m.row() for m in self.table.selectionModel().selectedRows()),
-                                reverse=True):
+        for model_idx in sorted(
+            (m.row() for m in self.table.selectionModel().selectedRows()), reverse=True
+        ):
             self.table.removeRow(model_idx)
 
     def _on_save(self) -> None:
@@ -208,8 +219,9 @@ class GlossaryPage(QWidget):
             with open(path, encoding="utf-8-sig", newline="") as fh:
                 for row in csv.reader(fh):
                     if len(row) >= 2 and row[0].strip() and row[1].strip():
-                        out.append((row[0].strip(), row[1].strip(),
-                                    row[2].strip() if len(row) > 2 else ""))
+                        out.append(
+                            (row[0].strip(), row[1].strip(), row[2].strip() if len(row) > 2 else "")
+                        )
             return out
 
         self._run(_read, self._on_imported)
@@ -237,8 +249,12 @@ class GlossaryPage(QWidget):
                     writer.writerow([term, trans, note])
             return len(values)
 
-        self._run(_write, lambda n: self._status(
-            tr("glossary.exported", self.lang_code, n=int(n or 0), path=target)))
+        self._run(
+            _write,
+            lambda n: self._status(
+                tr("glossary.exported", self.lang_code, n=int(n or 0), path=target)
+            ),
+        )
 
     def _on_tm_import(self) -> None:
         """把 TM 里已有的对照并入术语表（按原文去重，需再点保存）。"""
@@ -273,8 +289,14 @@ class GlossaryPage(QWidget):
 
     def _on_tm_stats(self, stats: object) -> None:
         d = dict(stats or {})  # type: ignore[arg-type]
-        self.lbl_tm.setText(tr("glossary.tm_stats", self.lang_code,
-                               entries=int(d.get("entries", 0)), hits=int(d.get("hits", 0))))
+        self.lbl_tm.setText(
+            tr(
+                "glossary.tm_stats",
+                self.lang_code,
+                entries=int(d.get("entries", 0)),
+                hits=int(d.get("hits", 0)),
+            )
+        )
 
     # ---------------------------------------------------------------- 工具
     def _run(self, fn, on_result) -> None:
@@ -318,8 +340,10 @@ class GlossaryPage(QWidget):
         self.btn_export.setText(tr("glossary.export", lang))
         self.btn_tm_import.setText(tr("glossary.tm_import", lang))
         self.box_tm.setTitle(tr("glossary.tm", lang))
-        self.table.setHorizontalHeaderLabels([
-            tr("glossary.col_src", lang),
-            tr("glossary.col_dst", lang),
-            tr("glossary.col_note", lang),
-        ])
+        self.table.setHorizontalHeaderLabels(
+            [
+                tr("glossary.col_src", lang),
+                tr("glossary.col_dst", lang),
+                tr("glossary.col_note", lang),
+            ]
+        )

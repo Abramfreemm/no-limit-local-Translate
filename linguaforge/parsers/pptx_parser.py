@@ -36,10 +36,10 @@ class PptxParseError(RuntimeError):
 class PptxParser:
     """解析 .pptx。用法：
 
-        with PptxParser(cfg) as p:
-            p.open(path)
-            for page in p.iter_pages():
-                ...
+    with PptxParser(cfg) as p:
+        p.open(path)
+        for page in p.iter_pages():
+            ...
     """
 
     extensions: set = {".pptx"}

@@ -9,8 +9,8 @@ from __future__ import annotations
 
 import re
 from collections import Counter
+from collections.abc import Iterator, Sequence
 from pathlib import Path
-from typing import Dict, Iterator, List, Optional, Sequence, Set, Tuple
 
 import pdfplumber
 from pypdf import PdfReader
@@ -21,10 +21,10 @@ from ..core.docir import Block, BlockState, BlockType, DocIR, Origin, Page, Run,
 # 行首有序/无序列表标记
 _RE_LIST = re.compile(
     r"^\s*(?:"
-    r"(?:\(?\d+(?:\.\d+)*[.)、])"          # 1. / 1.2) / 3、
-    r"|(?:[a-zA-Z][.)])"                    # a. / A)
-    r"|(?:[ivxIVX]+[.)])"                   # i. / IV)
-    r"|[•·▪◦‣*-–—]\s+"                      # 项目符号
+    r"(?:\(?\d+(?:\.\d+)*[.)、])"  # 1. / 1.2) / 3、
+    r"|(?:[a-zA-Z][.)])"  # a. / A)
+    r"|(?:[ivxIVX]+[.)])"  # i. / IV)
+    r"|[•·▪◦‣*-–—]\s+"  # 项目符号
     r"|(?:第\s*[0-9一二三四五六七八九十]+\s*[章节条])"  # 第3章
     r")"
 )
@@ -64,8 +64,7 @@ def _heading_level_of(size: float, body: float) -> int:
     return 0
 
 
-
-def chars_to_words(chars: Sequence[dict]) -> List[dict]:
+def chars_to_words(chars: Sequence[dict]) -> list[dict]:
     """从字符级对象聚合成词。
 
     不用 page.extract_words()：它在不带 extra_attrs 时返回的 size/fontname 为 None，
@@ -76,8 +75,8 @@ def chars_to_words(chars: Sequence[dict]) -> List[dict]:
     cs = sorted(chars, key=lambda c: (round(float(c.get("top", 0)), 1), float(c.get("x0", 0))))
 
     # 1) 按 top 分到各文本行
-    rows: List[List[dict]] = []
-    cur_row: List[dict] = [cs[0]]
+    rows: list[list[dict]] = []
+    cur_row: list[dict] = [cs[0]]
     cur_top = float(cs[0].get("top", 0))
     for c in cs[1:]:
         top = float(c.get("top", 0))
@@ -91,10 +90,10 @@ def chars_to_words(chars: Sequence[dict]) -> List[dict]:
     rows.append(cur_row)
 
     # 2) 行内按水平间距切词
-    words: List[dict] = []
+    words: list[dict] = []
     for row in rows:
         row.sort(key=lambda c: float(c.get("x0", 0)))
-        buf: List[dict] = []
+        buf: list[dict] = []
         for c in row:
             t = str(c.get("text", ""))
             if t.isspace() or t == "":
@@ -115,7 +114,7 @@ def chars_to_words(chars: Sequence[dict]) -> List[dict]:
     return words
 
 
-def _mk_word(chars: List[dict]) -> dict:
+def _mk_word(chars: list[dict]) -> dict:
     size = Counter(round(float(c.get("size", 10.0)), 1) for c in chars).most_common(1)[0][0]
     font = Counter(str(c.get("fontname", "")) for c in chars).most_common(1)[0][0]
     return {
@@ -133,25 +132,25 @@ def _mk_word(chars: List[dict]) -> dict:
 class PDFParser:
     """逐页解析 PDF。用法：
 
-        with PDFParser(cfg) as p:
-            p.open(path)
-            for page in p.iter_pages():
-                ...
+    with PDFParser(cfg) as p:
+        p.open(path)
+        for page in p.iter_pages():
+            ...
     """
 
-    def __init__(self, config: Optional[Config] = None) -> None:
+    def __init__(self, config: Config | None = None) -> None:
         self.cfg = config or Config()
-        self._pdf: Optional[pdfplumber.PDF] = None
-        self._reader: Optional[PdfReader] = None
+        self._pdf: pdfplumber.PDF | None = None
+        self._reader: PdfReader | None = None
         self.path: str = ""
         self.page_count: int = 0
-        self._header_fp: Set[str] = set()
-        self._footer_fp: Set[str] = set()
+        self._header_fp: set[str] = set()
+        self._footer_fp: set[str] = set()
         self._body_size: float = 10.0
         self._title: str = ""
 
     # ---------------- 生命周期 ----------------
-    def open(self, path: str | Path) -> "PDFParser":
+    def open(self, path: str | Path) -> PDFParser:
         self.path = str(path)
         self._pdf = pdfplumber.open(self.path)
         self.page_count = len(self._pdf.pages)
@@ -171,7 +170,7 @@ class PDFParser:
             self._pdf = None
         self._reader = None
 
-    def __enter__(self) -> "PDFParser":
+    def __enter__(self) -> PDFParser:
         return self
 
     def __exit__(self, *exc) -> None:
@@ -226,7 +225,9 @@ class PDFParser:
             try:
                 words = chars_to_words(self._pdf.pages[0].chars)
                 if words:
-                    top = max(words, key=lambda w: (float(w.get("size", 0)), -float(w.get("top", 1e9))))
+                    top = max(
+                        words, key=lambda w: (float(w.get("size", 0)), -float(w.get("top", 1e9)))
+                    )
                     self._title = str(top.get("text", ""))
             except Exception:
                 pass
@@ -247,7 +248,7 @@ class PDFParser:
             words_all = []
 
         # 表格优先
-        table_zones: List[Tuple[float, float, float, float]] = []
+        table_zones: list[tuple[float, float, float, float]] = []
         try:
             for ti, tbl in enumerate(pl.find_tables() or []):
                 bbox = tuple(tbl.bbox)  # type: ignore[assignment]
@@ -289,34 +290,34 @@ class PDFParser:
         pl.flush_cache()
         return page
 
-    def iter_pages(self, start: int = 0, end: Optional[int] = None) -> Iterator[Page]:
+    def iter_pages(self, start: int = 0, end: int | None = None) -> Iterator[Page]:
         """流式产出页面。绝不一次性构造全部 Page。"""
         end = self.page_count if end is None else min(end, self.page_count)
         for i in range(start, end):
             yield self.parse_page(i)
 
     # ---------------- 块构建 ----------------
-    def _build_blocks(self, words: Sequence[dict], pno: int, page_h: float) -> List[Block]:
+    def _build_blocks(self, words: Sequence[dict], pno: int, page_h: float) -> list[Block]:
         if not words:
             return []
         lines = self._group_lines(words)
         paras = self._merge_paragraphs(lines)
-        blocks: List[Block] = []
+        blocks: list[Block] = []
         for pi, ln_group in enumerate(paras):
             text = self._join_lines(ln_group)
             if not text.strip():
                 continue
             b = Block(page_index=pno, text=text)
             b.bbox = (
-                min(l.bbox[0] for l in ln_group),
-                min(l.bbox[1] for l in ln_group),
-                max(l.bbox[2] for l in ln_group),
-                max(l.bbox[3] for l in ln_group),
+                min(ln.bbox[0] for ln in ln_group),
+                min(ln.bbox[1] for ln in ln_group),
+                max(ln.bbox[2] for ln in ln_group),
+                max(ln.bbox[3] for ln in ln_group),
             )
-            size = max(l.size for l in ln_group)
-            bold = any(l.bold for l in ln_group)
-            italic = all(l.italic for l in ln_group)
-            font = Counter(l.font for l in ln_group).most_common(1)[0][0]
+            size = max(ln.size for ln in ln_group)
+            bold = any(ln.bold for ln in ln_group)
+            italic = all(ln.italic for ln in ln_group)
+            font = Counter(ln.font for ln in ln_group).most_common(1)[0][0]
             b.runs = [Run(text=text, font=font, size=size, bold=bold, italic=italic)]
             b.style = Style(font=font, size=size, bold=bold, italic=italic)
             b.style.align = self._align_of(b.bbox, page_h if False else None)
@@ -329,7 +330,9 @@ class PDFParser:
             blocks.append(b)
         return blocks
 
-    def _classify(self, text: str, size: float, bold: bool, bbox, page_h: float, pno: int = 0) -> BlockType:
+    def _classify(
+        self, text: str, size: float, bold: bool, bbox, page_h: float, pno: int = 0
+    ) -> BlockType:
         t = text.strip()
         # 页眉/页脚指纹命中
         if t in self._header_fp:
@@ -360,12 +363,12 @@ class PDFParser:
         return "left"
 
     # ---------------- 行 / 段 ----------------
-    def _group_lines(self, words: Sequence[dict]) -> List["_Line"]:
+    def _group_lines(self, words: Sequence[dict]) -> list[_Line]:
         if not words:
             return []
         ws = sorted(words, key=lambda w: (round(float(w.get("top", 0)), 1), float(w.get("x0", 0))))
-        lines: List[_Line] = []
-        cur: List[dict] = [ws[0]]
+        lines: list[_Line] = []
+        cur: list[dict] = [ws[0]]
         cur_top = float(ws[0].get("top", 0))
         for w in ws[1:]:
             top = float(w.get("top", 0))
@@ -379,10 +382,10 @@ class PDFParser:
         if cur:
             lines.append(_Line.from_words(cur))
         # 页内按视觉顺序（上到下）排序
-        lines.sort(key=lambda l: (round(l.bbox[1], 1), l.bbox[0]))
+        lines.sort(key=lambda ln: (round(ln.bbox[1], 1), ln.bbox[0]))
         return lines
 
-    def _merge_paragraphs(self, lines: List["_Line"]) -> List[List["_Line"]]:
+    def _merge_paragraphs(self, lines: list[_Line]) -> list[list[_Line]]:
         """把行合并为段落。
 
         断段依据（按可靠性排序）：
@@ -396,13 +399,13 @@ class PDFParser:
         # 版心右边线：只用正文字号的行来计算。
         # 若用全页最大 x1，会被大字号标题（往往更宽）抬高，导致正文满行被误判为“短行”，
         # 于是每个句号都断成一段。
-        body_lines = [l for l in lines if abs(l.size - self._body_size) <= 1.2]
+        body_lines = [ln for ln in lines if abs(ln.size - self._body_size) <= 1.2]
         base = body_lines or lines
-        left = min(l.bbox[0] for l in base)
-        right = max(l.bbox[2] for l in base)
+        left = min(ln.bbox[0] for ln in base)
+        right = max(ln.bbox[2] for ln in base)
         col_w = max(1.0, right - left)
-        groups: List[List[_Line]] = [[lines[0]]]
-        for prev, cur in zip(lines, lines[1:]):
+        groups: list[list[_Line]] = [[lines[0]]]
+        for prev, cur in zip(lines, lines[1:], strict=False):
             gap = cur.bbox[1] - prev.bbox[3]
             lh = max(prev.size, cur.size) * 1.2
             indent_delta = cur.bbox[0] - prev.bbox[0]
@@ -433,11 +436,11 @@ class PDFParser:
         return groups
 
     @staticmethod
-    def _join_lines(lines: List["_Line"]) -> str:
+    def _join_lines(lines: list[_Line]) -> str:
         """行合并为段落文本：英文补空格，CJK 直接拼接；处理换行连字符。"""
-        out: List[str] = []
-        for i, l in enumerate(lines):
-            t = l.text.rstrip()
+        out: list[str] = []
+        for i, ln in enumerate(lines):
+            t = ln.text.rstrip()
             if i < len(lines) - 1 and t.endswith(("-", "‐", "‑")):
                 out.append(t[:-1])
                 continue
@@ -449,7 +452,7 @@ class PDFParser:
 
     # ---------------- 工具 ----------------
     @staticmethod
-    def _in_zones(w: dict, zones: Sequence[Tuple[float, float, float, float]]) -> bool:
+    def _in_zones(w: dict, zones: Sequence[tuple[float, float, float, float]]) -> bool:
         if not zones:
             return False
         cx = (float(w.get("x0", 0)) + float(w.get("x1", 0))) / 2
@@ -460,7 +463,7 @@ class PDFParser:
         return False
 
     @staticmethod
-    def _cell_bbox(tbl, r: int, c: int, fallback) -> Tuple[float, float, float, float]:
+    def _cell_bbox(tbl, r: int, c: int, fallback) -> tuple[float, float, float, float]:
         try:
             cell = tbl.rows[r].cells[c]
             if cell:
@@ -472,6 +475,7 @@ class PDFParser:
     @staticmethod
     def _renumber(page: Page) -> None:
         """按视觉阅读顺序重排：表格块跟随其所在位置。"""
+
         def key(b: Block):
             # 有 bbox 的列优先（双栏：先左后右），再按 y
             col_split = page.width * 0.5
@@ -483,7 +487,7 @@ class PDFParser:
             b.reading_order = i
         page.blocks = ordered
 
-    def outline(self) -> List[Dict]:
+    def outline(self) -> list[dict]:
         """书签（目录）"""
         if self._reader is None:
             return []
@@ -492,7 +496,7 @@ class PDFParser:
         except Exception:
             return []
 
-    def to_docir(self, max_pages: Optional[int] = None) -> DocIR:
+    def to_docir(self, max_pages: int | None = None) -> DocIR:
         """把整份文档读成 DocIR（仅用于小文件 / 单测；生产请走 iter_pages）。"""
         doc = DocIR(
             source_path=self.path,
@@ -519,9 +523,9 @@ class _Line:
         self.type: BlockType = BlockType.UNKNOWN
 
     @classmethod
-    def from_words(cls, words: List[dict]) -> "_Line":
+    def from_words(cls, words: list[dict]) -> _Line:
         ws = sorted(words, key=lambda w: float(w.get("x0", 0)))
-        parts: List[str] = []
+        parts: list[str] = []
         for i, w in enumerate(ws):
             t = str(w.get("text", ""))
             if parts:

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional
 
 import pypdfium2 as pdfium
 
@@ -19,7 +18,7 @@ class PDFRenderer:
     def page_count(self) -> int:
         return len(self._doc)
 
-    def render(self, index: int, dpi: Optional[int] = None) -> "Image.Image":  # noqa: F821
+    def render(self, index: int, dpi: int | None = None) -> Image.Image:  # noqa: F821
         from PIL import Image  # noqa: F401  (确保 Pillow 可用)
 
         d = dpi or self.dpi
@@ -27,7 +26,7 @@ class PDFRenderer:
         bmp = page.render(scale=d / 72.0)
         return bmp.to_pil()
 
-    def render_bytes(self, index: int, dpi: Optional[int] = None, fmt: str = "PNG") -> bytes:
+    def render_bytes(self, index: int, dpi: int | None = None, fmt: str = "PNG") -> bytes:
         import io
 
         img = self.render(index, dpi)
@@ -41,14 +40,14 @@ class PDFRenderer:
         except Exception:
             pass
 
-    def __enter__(self) -> "PDFRenderer":
+    def __enter__(self) -> PDFRenderer:
         return self
 
     def __exit__(self, *exc) -> None:
         self.close()
 
 
-def render_pdf_page(path: str | Path, index: int, dpi: int = 200) -> "Image.Image":  # noqa: F821
+def render_pdf_page(path: str | Path, index: int, dpi: int = 200) -> Image.Image:  # noqa: F821
     """一次性渲染单页（无句柄复用，适合临时调用）。"""
     with PDFRenderer(path, dpi) as r:
         return r.render(index, dpi)

@@ -6,8 +6,8 @@
 from __future__ import annotations
 
 import re
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Iterator, List
 
 from ..core.docir import Block, BlockState, BlockType, DocIR, Origin, Page, Style
 
@@ -21,10 +21,10 @@ class TextParser:
 
     def __init__(self, config=None) -> None:
         self.path = ""
-        self.lines: List[str] = []
+        self.lines: list[str] = []
         self.page_count = 1
 
-    def open(self, path: str | Path) -> "TextParser":
+    def open(self, path: str | Path) -> TextParser:
         self.path = str(path)
         self.lines = Path(path).read_text(encoding="utf-8", errors="replace").splitlines()
         return self
@@ -32,7 +32,7 @@ class TextParser:
     def close(self) -> None:
         self.lines = []
 
-    def __enter__(self) -> "TextParser":
+    def __enter__(self) -> TextParser:
         return self
 
     def __exit__(self, *exc) -> None:
@@ -45,7 +45,7 @@ class TextParser:
     def parse_page(self, index: int = 0) -> Page:
         page = Page(index=index, width=595.0, height=842.0)
         order = 0
-        para_buf: List[str] = []
+        para_buf: list[str] = []
         para_type = BlockType.PARAGRAPH
 
         def flush() -> None:

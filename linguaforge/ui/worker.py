@@ -28,9 +28,22 @@ from ..translate.ollama_client import OllamaClient
 
 #: UI 接受拖入的输入扩展名（最终清单）
 INPUT_EXTS: tuple[str, ...] = (
-    ".pdf", ".docx", ".pptx", ".xlsx",
-    ".txt", ".md", ".html", ".srt", ".vtt",
-    ".png", ".jpg", ".jpeg", ".tif", ".tiff", ".bmp", ".webp",
+    ".pdf",
+    ".docx",
+    ".pptx",
+    ".xlsx",
+    ".txt",
+    ".md",
+    ".html",
+    ".srt",
+    ".vtt",
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".tif",
+    ".tiff",
+    ".bmp",
+    ".webp",
 )
 
 #: 输出格式（传给 Pipeline.run 的 fmt 字符串）
@@ -71,6 +84,7 @@ def out_path_for(src: Path, fmt: str, out_dir: str | Path | None) -> Path:
 
 
 # ---------------------------------------------------------------- 暂停闸门
+
 
 class PauseGate:
     """暂停 / 继续 / 取消三态闸门，线程安全。"""
@@ -114,6 +128,7 @@ class PauseGate:
 
 
 # ---------------------------------------------------------------- 翻译线程
+
 
 class TranslateWorker(QThread):
     """后台跑 Pipeline 的线程。
@@ -242,6 +257,7 @@ class TranslateWorker(QThread):
 
 # ---------------------------------------------------------------- Ollama 探测
 
+
 class OllamaProbeWorker(QThread):
     """检测 Ollama 连通性并列出本地模型（含体积 / 参数规模）。"""
 
@@ -269,11 +285,12 @@ class OllamaProbeWorker(QThread):
 
 # ---------------------------------------------------------------- 模型拉取
 
+
 class ModelPullWorker(QThread):
     """流式拉取模型（POST /api/pull），带进度与取消。"""
 
-    sig_progress = Signal(str, float)   # (状态文本, 百分比；-1 表示不确定)
-    sig_done = Signal(bool, str)        # (是否成功, 说明)
+    sig_progress = Signal(str, float)  # (状态文本, 百分比；-1 表示不确定)
+    sig_done = Signal(bool, str)  # (是否成功, 说明)
 
     def __init__(self, host: str, name: str, parent: Any | None = None) -> None:
         super().__init__(parent)
@@ -292,7 +309,8 @@ class ModelPullWorker(QThread):
             timeout = httpx.Timeout(30.0, read=None)
             with httpx.Client(timeout=timeout) as client:
                 with client.stream(
-                    "POST", f"{self.host}/api/pull",
+                    "POST",
+                    f"{self.host}/api/pull",
                     json={"name": self.name, "stream": True},
                 ) as resp:
                     resp.raise_for_status()
@@ -323,6 +341,7 @@ class ModelPullWorker(QThread):
 
 
 # ---------------------------------------------------------------- 通用调用
+
 
 class CallWorker(QThread):
     """把任意耗时 callable 丢到后台线程，主线程不阻塞。
