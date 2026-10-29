@@ -30,30 +30,9 @@ jobs:
           python-version: "3.12"
           cache: pip
 
-      - name: 安装依赖与工具
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install pytest pytest-cov ruff pip-licenses pip-audit
-
-      - name: ruff check
-        run: ruff check .
-
-      - name: ruff format
-        run: ruff format --check .
-
-      - name: pytest
-        env:
-          PYTHONIOENCODING: utf-8
-          PYTHONUTF8: "1"
-        run: pytest tests -q --cov=linguaforge --cov-report=term-missing
-
-      - name: 许可合规
-        run: pip-licenses --fail-on="AGPL;NC;Nonstandard" || {
-          echo "::error::检测到受限许可依赖，禁止发版"; exit 1; }
-
-      - name: 依赖漏洞
-        run: pip-audit -r requirements.lock --strict --progress-spinner=off
+      # 与 ci.yml 共用同一份实现。tag push 不触发 ci.yml，needs 也不能跨 workflow，
+      # 所以发版路径必须自带这道门禁；共用 action 保证两处永不漂移。
+      - uses: ./.github/actions/quality-gate
 
   build-windows:
     name: Windows · exe 安装包

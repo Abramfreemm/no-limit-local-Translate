@@ -1,0 +1,90 @@
+name: LinguaForge 质量门禁
+description: |
+  静态检查 + 单测 + 依赖完整性 + 许可合规 + 漏洞扫描。
+
+  为什么要抽成 composite action：
+  ci.yml（分支 / PR）与 release.yml（tag 发版）需要完全相同的检查，
+  但 tag push 不触发 ci.yml，且 `needs` 不能跨 workflow —— 所以发版流程
+  必须自带一份。早期两处各写一遍，很快就漂移了（release.yml 少了
+  pip check 与精确许判定）。共用一份实现，从结构上消除漂移。
+
+  前置条件：调用方须先 checkout 并 setup-python（本 action 不自带，
+  因为 matrix 的 python-version 由调用方决定）。
+
+runs:
+  using: composite
+  steps:
+    - name: 安装运行时依赖与门禁工具
+      shell: bash
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest pytest-cov ruff pip-licenses pip-audit
+
+    - name: 静态检查 · ruff check
+      shell: bash
+      run: ruff check .
+
+    - name: 静态检查 · ruff format
+      shell: bash
+      run: ruff format --check .
+
+    - name: 单元测试 · pytest
+      shell: bash
+      env:
+        PYTHONIOENCODING: utf-8
+        PYTHONUTF8: "1"
+      run: python -m pytest tests -q --cov=linguaforge --cov-report=term-missing
+
+    - name: 依赖完整性 · pip check
+      shell: bash
+      # 已知例外：rapidocr-onnxruntime 硬声明 opencv-python，而我们安装的是
+      # headless 版（模块名同为 cv2，但不捆绑 Qt，避免与 PySide6 的 Qt 冲突）。
+      # 除这一条外的任何其他缺失依赖都必须让 CI 变红。
+      run: |
+        set -o pipefail
+        out=$(pip check 2>&1 || true)
+        echo "$out"
+        filtered=$(echo "$out" | grep -v "requires opencv-python, which is not installed" | grep -v "^$" || true)
+        if [ -n "$filtered" ]; then
+          echo "::error::存在未解决的依赖冲突"
+          exit 1
+        fi
+        echo "✅ 仅剩已知的 opencv-python/headless 例外"
+
+    - name: 许可合规 · 无强传染性 / 非商用许可
+      shell: bash
+      # 与 09 号合规清单第 1 节一致。这里不用 pip-licenses --fail-on，
+      # 因为它是子串匹配，"GPL" 会误伤 PySide6 的 LGPL-3.0（动态链接，允许）。
+      # 改为脚本精确判定：AGPL / 非 LGPL 的 GPL / NC / Nonstandard 才阻断。
+      run: |
+        pip-licenses --format=csv --with-urls --output-file=licenses.csv
+        python - <<'PY'
+        import csv, sys
+        bad = []
+        with open("licenses.csv", encoding="utf-8") as fh:
+            for row in csv.DictReader(fh):
+                lic = (row.get("License") or "").strip()
+                low = lic.lower()
+                if "agpl" in low:
+                    bad.append((row["Name"], lic, "AGPL 强传染"))
+                elif "gpl" in low and "lgpl" not in low:
+                    bad.append((row["Name"], lic, "GPL 强传染（非 LGPL）"))
+                elif "nc" == low or "non-commercial" in low or "noncommercial" in low:
+                    bad.append((row["Name"], lic, "非商用限制"))
+                elif low.startswith("nonstandard") or "proprietary" in low:
+                    bad.append((row["Name"], lic, "非标准/专有"))
+        if bad:
+            for n, l, why in bad:
+                print(f"::error::{n} = {l} → {why}")
+            sys.exit(1)
+        print("✅ 无强传染性 / 非商用许可依赖")
+        PY
+
+    - name: 依赖漏洞 · pip-audit
+      shell: bash
+      # 审计 requirements.txt 而不是 requirements.lock：
+      # lock 是本机 Windows 快照（含 pywin32-ctypes 等 Windows-only 包），
+      # 在 ubuntu / macos runner 上解析会失败，且它本来就不代表 CI 实际装的依赖集。
+      # 高危必须清零；若暂时无法升级，须在 09 号风险表登记缓解措施并在此豁免。
+      run: pip-audit -r requirements.txt --strict --progress-spinner=off

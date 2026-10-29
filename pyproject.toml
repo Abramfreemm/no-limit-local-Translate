@@ -72,6 +72,9 @@ ignore = ["E501"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# 仓库根加进 sys.path。裸 `pytest` 不会像 `python -m pytest` 那样自动插入 cwd，
+# 而本项目未做 pip install -e .，所以必须显式声明，否则 CI 上 import linguaforge 直接失败。
+pythonpath = ["."]
 markers = [
     "slow: 需要 Ollama 或 OCR 模型的集成测试",
 ]
