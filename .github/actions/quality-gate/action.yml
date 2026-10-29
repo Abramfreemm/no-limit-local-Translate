@@ -103,7 +103,6 @@ runs:
             sys.exit(1)
         print("✅ 无强传染性 / 非商用许可依赖")
         PY
-        PY
 
     - name: 依赖漏洞 · pip-audit
       shell: bash
