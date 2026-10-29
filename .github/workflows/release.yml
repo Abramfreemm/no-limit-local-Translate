@@ -140,6 +140,12 @@ jobs:
           iconutil -c icns resources/icons/tmp.iconset -o resources/icons/app.icns
           rm -rf resources/icons/tmp.iconset
 
+      - name: 架构断言（必须是 arm64）
+        # macos-14 已是 arm64，但这行是防呆：GitHub 换过 runner 环境变体，
+        # 一旦跑到 x64 上会产出一份跑不起来的 dmg，而「.app 存在」查不出来。
+        run: |
+          python -c "import platform; print(platform.machine()); assert platform.machine()=='arm64', 'runner 不是 arm64'"
+
       - name: PyInstaller 打包 .app
         run: pyinstaller packaging/mac/linguaforge.spec --noconfirm --clean
 
