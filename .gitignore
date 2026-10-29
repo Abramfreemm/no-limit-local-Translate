@@ -21,6 +21,9 @@ htmlcov/
 *.spec.bak
 packaging/**/Output/
 packaging/**/output/
+# 发布产物目录：exe/dmg 由上面两条忽略，此处连同哈希清单一起排除。
+# SHA256SUMS.txt 随每次构建变化，属发布物，随 GitHub Release 分发而非入库。
+releases/
 
 # ---------- 大体积资源（不入库，构建时脚本下载） ----------
 resources/ocr_models/*.onnx
