@@ -20,6 +20,7 @@ from pathlib import Path
 from ..core.config import Config
 from ..core.docir import DocIR, Page
 from ..core.problems import DocumentParseError
+from ..core.safeguards import guard_input
 
 _DEFAULT_DPI = 96.0
 
@@ -64,6 +65,7 @@ class ImageParser:
         return Path(path).suffix.lower() in self.extensions
 
     def open(self, path) -> ImageParser:
+        guard_input(path, "image")
         p = Path(path)
         if not p.exists():
             raise FileNotFoundError(f"文件不存在: {p}")

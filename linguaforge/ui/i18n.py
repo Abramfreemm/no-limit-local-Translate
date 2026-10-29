@@ -315,3 +315,224 @@ def tr(key: str, lang: str | None = None, **kwargs: object) -> str:
         except (KeyError, IndexError, ValueError):
             return text
     return text
+
+
+# ---------------------------------------------------------------------------
+# 错误码 -> 用户文案（19 号 §2 全表）
+#
+# UI 唯一的职责就是把 Problem 渲染成人类可读文案，不再自己拼字符串。
+# 三段式：发生了什么 / 为什么 / 你能做什么。
+# ---------------------------------------------------------------------------
+
+PROBLEM_TEXT: dict[str, dict[str, str]] = {
+    # ---------------- E 域 · 环境与依赖 ----------------
+    "LF-E01": {
+        "zh": "没连上 Ollama（本机翻译引擎）。它可能没有启动。请先打开 Ollama，再点「重新检测」。",
+        "en": "Cannot reach Ollama (the local translation engine). It may not be running. Start Ollama, then click Re-detect.",
+    },
+    "LF-E02": {
+        "zh": "这台电脑上没找到 Ollama。它是本软件依赖的翻译引擎，需要单独安装（免费）。",
+        "en": "Ollama was not found on this computer. It is the translation engine this app relies on and must be installed separately (free).",
+    },
+    "LF-E03": {
+        "zh": "你的 Ollama 版本较旧（当前 {version}，建议 ≥ {min_required}），部分功能可能异常。建议升级。",
+        "en": "Your Ollama version is old (current {version}, recommended ≥ {min_required}). Some features may misbehave. Consider upgrading.",
+    },
+    "LF-E04": {
+        "zh": "模型「{model}」还没有下载。下载后即可使用。本机已有：{available}",
+        "en": "Model “{model}” has not been downloaded yet. Download it to continue. Already available: {available}",
+    },
+    "LF-E05": {
+        "zh": "模型「{model}」加载失败，可能是内存不足。换一个小一点的模型通常可以解决。",
+        "en": "Failed to load model “{model}”, possibly due to insufficient memory. A smaller model usually works.",
+    },
+    "LF-E06": {
+        "zh": "模型下载没有完成，可能是网络中断。可以重新下载，已下载的部分会保留。",
+        "en": "The model download did not finish, possibly due to a network interruption. Retrying keeps the downloaded part.",
+    },
+    "LF-E07": {
+        "zh": "文字识别组件缺失，扫描页将被跳过（其余页正常翻译）。",
+        "en": "The OCR component is missing. Scanned pages will be skipped (other pages translate normally).",
+    },
+    "LF-E08": {
+        "zh": "文字识别模型文件异常，扫描页无法识别。",
+        "en": "The OCR model files are invalid. Scanned pages cannot be recognised.",
+    },
+    "LF-E09": {
+        "zh": "磁盘空间不够。这次大约需要 {need_mb} MB，{drive} 盘还剩 {free_mb} MB。",
+        "en": "Not enough disk space. This run needs about {need_mb} MB; {drive} has {free_mb} MB free.",
+    },
+    "LF-E10": {
+        "zh": "无法写入输出目录「{dir}」。它可能是只读的，或被其他程序占用。",
+        "en": "Cannot write to the output directory “{dir}”. It may be read-only or in use by another program.",
+    },
+    "LF-E11": {
+        "zh": "检测到系统代理，可能影响本机服务连接。已自动绕过 127.0.0.1。",
+        "en": "A system proxy was detected and could affect local connections. 127.0.0.1 is bypassed automatically.",
+    },
+    "LF-E12": {
+        "zh": "Ollama 正在监听「{host}」，可能被局域网内其他设备访问。建议改回 127.0.0.1。",
+        "en": "Ollama is listening on “{host}”, which may be reachable from your network. Bind it back to 127.0.0.1.",
+    },
+    # ---------------- D 域 · 文档输入 ----------------
+    "LF-D01": {
+        "zh": "找不到文件「{name}」。它可能被移动或删除了。",
+        "en": "Cannot find file “{name}”. It may have been moved or deleted.",
+    },
+    "LF-D02": {
+        "zh": "「{name}」是空文件（0 字节），没有可翻译的内容。",
+        "en": "“{name}” is an empty file (0 bytes); there is nothing to translate.",
+    },
+    "LF-D03": {
+        "zh": "「{name}」设置了打开密码，暂不支持。请先在原软件里取消密码。",
+        "en": "“{name}” is password-protected, which is not supported. Remove the password first.",
+    },
+    "LF-D04": {
+        "zh": "暂不支持「{ext}」格式。目前支持：{list}",
+        "en": "“{ext}” format is not supported. Supported: {list}",
+    },
+    "LF-D05": {
+        "zh": "「{name}」文件结构损坏，无法读取。",
+        "en": "“{name}” is structurally damaged and cannot be read.",
+    },
+    "LF-D06": {
+        "zh": "第 {page} 页尺寸异常（{w}×{h}），已跳过。",
+        "en": "Page {page} has an abnormal size ({w}×{h}) and was skipped.",
+    },
+    "LF-D07": {
+        "zh": "「{name}」内部结构异常（疑似压缩炸弹），出于安全已拒绝打开。",
+        "en": "“{name}” has an abnormal internal structure (possible compression bomb). Refused to open for safety.",
+    },
+    "LF-D08": {
+        "zh": "图片尺寸过大（{w}×{h}），无法处理。",
+        "en": "Image is too large ({w}×{h}) to process.",
+    },
+    "LF-D09": {
+        "zh": "文档结构异常（嵌套过深），已停止解析以避免卡死。",
+        "en": "Abnormal document structure (too deeply nested). Parsing stopped to avoid a hang.",
+    },
+    "LF-D10": {
+        "zh": "「{name}」正被其他程序占用。关闭占用它的程序后重试。",
+        "en": "“{name}” is locked by another program. Close it and retry.",
+    },
+    "LF-D11": {
+        "zh": "「{name}」处理超时（超过 {n} 分钟），已停止。这个文件可能结构异常复杂。",
+        "en": "“{name}” timed out after {n} minutes and was stopped. The file may be unusually complex.",
+    },
+    # ---------------- T 域 · 翻译过程 ----------------
+    "LF-T01": {
+        "zh": "模型输出格式异常，已自动改用备用解析方式。",
+        "en": "Unexpected model output format; fell back to an alternative parser.",
+    },
+    "LF-T02": {
+        "zh": "模型返回的条目数与请求不符，已自动改用备用解析方式。",
+        "en": "Model returned a different number of items; fell back to an alternative parser.",
+    },
+    "LF-T03": {
+        "zh": "模型响应超时。已自动重试并拆分批次；若仍失败，相关段落保留原文。",
+        "en": "Model response timed out. Retried with smaller batches; if it still fails, the affected passages keep the original text.",
+    },
+    "LF-T04": {
+        "zh": "模型返回内容为空，相关段落保留原文。",
+        "en": "Model returned empty content; the affected passages keep the original text.",
+    },
+    "LF-T05": {
+        "zh": "部分长段落超出模型上下文，已自动拆分重译。",
+        "en": "Some long passages exceeded the model context and were split and retranslated.",
+    },
+    "LF-T06": {
+        "zh": "第 {pages} 页的 {n} 段翻译失败。原文已保留，可直接阅读。",
+        "en": "Translation failed for {n} passages on page {pages}. The original text is preserved.",
+    },
+    "LF-T07": {
+        "zh": "术语表里「{term}」有 {n} 种译法，已按最后一条生效。",
+        "en": "The glossary has {n} translations for “{term}”; the last one is used.",
+    },
+    "LF-T08": {
+        "zh": "{n} 段翻译失败，已保留原文。",
+        "en": "{n} passages failed to translate; the original text is preserved.",
+    },
+    "LF-T09": {
+        "zh": "主模型「{primary}」不可用，且没有可用的备用模型。建议再装一个较小的模型作为备用。",
+        "en": "Primary model “{primary}” is unavailable and no fallback model works. Install a smaller model as a backup.",
+    },
+    # ---------------- O 域 · 输出 ----------------
+    "LF-O01": {
+        "zh": "生成「{fmt}」文件失败。{detail}",
+        "en": "Failed to generate “{fmt}” output. {detail}",
+    },
+    "LF-O02": {
+        "zh": "中文字体嵌入失败，译文可能显示为方框。已回退到系统字体。",
+        "en": "Failed to embed the CJK font; translated text may render as boxes. Fell back to a system font.",
+    },
+    "LF-O03": {
+        "zh": "写入过程中磁盘满了。请清理空间后重试（已译内容已保存，可续跑）。",
+        "en": "Disk became full while writing. Free space and retry (translated pages are saved and resumable).",
+    },
+    "LF-O04": {
+        "zh": "输出文件名已自动调整为「{name}」。",
+        "en": "The output filename was adjusted to “{name}”.",
+    },
+    "LF-O05": {
+        "zh": "输出文件「{name}」正被打开。关闭它后重试。",
+        "en": "Output file “{name}” is open elsewhere. Close it and retry.",
+    },
+    # ---------------- S 域 · 系统内部 ----------------
+    "LF-S01": {
+        "zh": "程序遇到一个未预期的错误。已自动记录日志，可复制诊断信息反馈给我们。",
+        "en": "An unexpected error occurred. It has been logged; you can copy diagnostics for support.",
+    },
+    "LF-S02": {
+        "zh": "本地进度数据库异常，本次无法续跑，将从头开始。",
+        "en": "The local progress database is broken; this run cannot resume and will start over.",
+    },
+    "LF-S03": {
+        "zh": "内存不足，任务已中止（已译内容已保存，可续跑）。",
+        "en": "Out of memory. The task was stopped (translated pages are saved and resumable).",
+    },
+    "LF-S04": {
+        "zh": "设置文件损坏，已重置为默认值。",
+        "en": "The settings file was corrupted and has been reset to defaults.",
+    },
+    # ---------------- U 域 · 用户操作 ----------------
+    "LF-U01": {"zh": "先拖入要翻译的文件。", "en": "Add files to translate first."},
+    "LF-U02": {
+        "zh": "还没有选翻译模型。去「模型」页选一个。",
+        "en": "No translation model selected. Pick one on the Models page.",
+    },
+    "LF-U03": {
+        "zh": "「{name}」不是 PDF，无法生成保排 PDF，将改用 Markdown 输出。",
+        "en": "“{name}” is not a PDF, so layout-preserving PDF output is unavailable; Markdown will be used.",
+    },
+    "LF-U04": {"zh": "已取消。", "en": "Cancelled."},
+    "LF-U05": {
+        "zh": "这份文档共 {pages} 页，预计需要约 {minutes} 分钟。翻译过程中可以随时暂停，已译内容会自动保存。",
+        "en": "This document has {pages} pages; expect about {minutes} minutes. You can pause anytime — translated pages are saved automatically.",
+    },
+    "LF-S99": {"zh": "发生了一个未知错误。", "en": "An unknown error occurred."},
+}
+
+
+def problem_text(problem, lang: str | None = None) -> str:
+    """把一个 :class:`Problem` 渲染成用户可见文案。
+
+    优先用该码在目标语言下的文案；缺失时退回 ``detail``，再退回码本身。
+    文案里的 ``{param}`` 用 ``problem.params`` 插值。
+
+    :param problem: 待渲染的问题对象
+    :param lang: 目标语言，缺省按当前界面语言
+    """
+    entry = PROBLEM_TEXT.get(problem.code)
+    if not entry:
+        return problem.detail or str(problem.code)
+
+    which = "zh" if normalize_lang(lang) == ZH else "en"
+    template = entry.get(which) or entry.get("zh") or entry.get("en")
+    if not template:
+        return problem.detail or str(problem.code)
+
+    try:
+        return template.format(**problem.params)
+    except (KeyError, IndexError, ValueError):
+        # 文案与 params 不匹配时保留占位符，便于发现，而不是静默输出半截话
+        return template

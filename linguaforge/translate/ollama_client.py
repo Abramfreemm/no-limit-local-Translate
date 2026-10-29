@@ -21,7 +21,12 @@ class OllamaClient:
     def __init__(self, host: str = "http://127.0.0.1:11434", timeout: float = 300.0) -> None:
         self.host = host.rstrip("/")
         self.timeout = timeout
-        self._client = httpx.Client(timeout=timeout)
+        # trust_env=False：忽略 HTTP(S)_PROXY 等环境变量。
+        # Ollama 跑在本机回环地址，本就不该走代理；而用户在公司网络/科学上网
+        # 环境下常设了全局代理，一旦生效，请求会被发往代理服务器 —— 既连不上
+        # （表现为"Ollama 没启动"的假故障），又把本机请求特征暴露给代理方。
+        # 见 17 号 §7 / 19 号 LF-E11。
+        self._client = httpx.Client(timeout=timeout, trust_env=False)
 
     # ---------- 基础 ----------
     def version(self) -> str:

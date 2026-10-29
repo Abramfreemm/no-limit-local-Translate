@@ -25,6 +25,7 @@ from openpyxl.utils import get_column_letter
 from ..core.config import Config
 from ..core.docir import Block, BlockState, BlockType, DocIR, Origin, Page, Style
 from ..core.problems import DocumentParseError
+from ..core.safeguards import guard_input
 
 # 超过此规模就先探测真实使用范围，避免遍历百万空行
 _SPARSE_CELL_BUDGET = 2_000_000
@@ -66,6 +67,7 @@ class XlsxParser:
         return Path(path).suffix.lower() in self.extensions
 
     def open(self, path) -> XlsxParser:
+        guard_input(path, "xlsx")
         p = Path(path)
         if not p.exists():
             raise FileNotFoundError(f"文件不存在: {p}")

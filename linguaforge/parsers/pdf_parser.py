@@ -17,6 +17,7 @@ from pypdf import PdfReader
 
 from ..core.config import Config
 from ..core.docir import Block, BlockState, BlockType, DocIR, Origin, Page, Run, Style
+from ..core.safeguards import guard_input
 
 # 行首有序/无序列表标记
 _RE_LIST = re.compile(
@@ -151,6 +152,7 @@ class PDFParser:
 
     # ---------------- 生命周期 ----------------
     def open(self, path: str | Path) -> PDFParser:
+        guard_input(path, "pdf")
         self.path = str(path)
         self._pdf = pdfplumber.open(self.path)
         self.page_count = len(self._pdf.pages)

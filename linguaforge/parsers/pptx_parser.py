@@ -25,6 +25,7 @@ from pptx.util import Emu
 from ..core.config import Config
 from ..core.docir import Block, BlockState, BlockType, DocIR, Origin, Page, Run, Style
 from ..core.problems import DocumentParseError
+from ..core.safeguards import guard_input
 
 EMU_PER_PT = 12700.0
 _DEFAULT_BBOX = (0.0, 0.0, 0.0, 0.0)
@@ -65,6 +66,7 @@ class PptxParser:
         return Path(path).suffix.lower() in self.extensions
 
     def open(self, path) -> PptxParser:
+        guard_input(path, "pptx")
         p = Path(path)
         if not p.exists():
             raise FileNotFoundError(f"文件不存在: {p}")

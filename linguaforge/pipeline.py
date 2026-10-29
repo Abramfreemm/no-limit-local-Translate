@@ -25,6 +25,7 @@ from typing import Any
 
 from .core.config import Config
 from .core.docir import Block, BlockState, BlockType, Page
+from .core.logging import get_logger
 from .core.problems import Code, Problem, from_exception
 from .ocr import RapidOCREngine
 from .parsers import PDFParser, TextParser
@@ -268,13 +269,21 @@ class Pipeline:
         store: Store | None = None,
     ) -> None:
         self.cfg = cfg or Config()
-        self.log = log or (lambda _m: None)
+        if log is not None:
+            self.log = log
+        else:
+            # 没传 log 时自动落盘。此前 loguru 在依赖里但全库零引用，
+            # GUI（console=False）未捕获异常的 traceback 直接消失，用户只看到闪退。
+            _lg = get_logger("pipeline")
+            self.log = lambda m: _lg.info(str(m))
         self._ocr = ocr
         self.translator = translator or Translator(self.cfg, log=self.log)
         self.glossary = self.translator.glossary
         self.tm = self.translator.tm
         self._store = store
         self._own_store = store is None
+        # 预检查产生的非阻断问题，run() 结束前并入 res.errors
+        self._pending_problems: list = []
 
     # ---------------- 依赖 ----------------
     @property
@@ -320,15 +329,38 @@ class Pipeline:
         resume: bool = True,
         page_range: tuple | None = None,
         store: Store | None = None,
+        preflight: bool = False,
     ) -> PipelineResult:
         """执行翻译任务。
 
         :param resume: 为 True 时接 SQLite，中断后再跑同一文件可从断点继续
         :param page_range: (start, end) 页码范围（0-based，end 不含），用于抽样试翻
         :param store: 外部传入的 Store（UI 复用一个连接时用）
+        :param preflight: 为 True 时先跑开工前检查（Ollama / 模型 / 磁盘 /
+            目录可写），有阻断项则直接返回。**默认 False** —— 预检查属
+            「UI 层开始前」动作，内核保持无头可 mock，单测与脚本不受影响。
         """
         t0 = time.time()
         src = Path(src)
+
+        # ---------------- 开工前预检查（13 号旅程 E） ----------------
+        # 能在开始前拦下的错误，绝不留到跑了 40 分钟才报。
+        # 预检查自身耗时 < 1.5 s（一次 /api/version + 一次 /api/tags）。
+        if preflight:
+            from .core.preflight import run_preflight
+
+            pf = run_preflight(self.cfg, [src], out_dir=Path(out).parent if out else src.parent)
+            res_pf = PipelineResult(
+                ok=False,
+                source=str(src),
+                errors=pf.problems,
+                fmt=fmt or "",
+            )
+            if not pf.ok:
+                return res_pf
+            # 非阻断的问题（如 OCR 不可用、代理告警）继续，但带进结果里
+            self._pending_problems = pf.problems
+
         if not src.exists():
             return PipelineResult(
                 ok=False,
@@ -542,6 +574,10 @@ class Pipeline:
                 sink.finalize(out_path)
 
             res.pages = pages_done
+            # 合并预检查阶段的非阻断问题（OCR 不可用、代理告警等）
+            if self._pending_problems:
+                res.errors = self._pending_problems + res.errors
+                self._pending_problems = []
             res.elapsed_s = time.time() - t0
             res.ok = not res.errors or res.translated > 0 or res.reused > 0
             if st is not None and task_id:

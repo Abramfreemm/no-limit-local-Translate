@@ -24,7 +24,6 @@ import copy
 import io
 import re
 import shutil
-import tempfile
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -36,6 +35,7 @@ from reportlab.pdfgen import canvas
 
 from ..core.docir import BlockType, Page
 from ..core.fonts import ensure_body_font, ensure_bold_font
+from ..core.paths import new_task_tmpdir
 
 MIN_FONT = 4.0  # 小于这个字号人眼不可读，宁可溢出也不再缩
 MAX_FONT = 26.0
@@ -255,7 +255,11 @@ class PDFRebuildWriter:
             )
         # 分片目录必须在**系统临时区**：源文件可能和用户选择的输出目录不同盘，
         # 若把分片写到源文件旁边，最后跨卷 rename 会直接失败（WinError 17）。
-        self.tmp_dir = Path(tmp_dir) if tmp_dir else Path(tempfile.gettempdir()) / "lf_parts"
+        #
+        # 但不能用固定的 %TEMP%/lf_parts —— 两个实例并发翻译会互相覆盖分片，
+        # 进程被杀后残留也永远清不掉。改为每任务一个带 pid 的唯一目录，
+        # 由 paths.sweep_orphan_tmpdirs() 在启动时回收。
+        self.tmp_dir = Path(tmp_dir) if tmp_dir else new_task_tmpdir("pdf_parts")
         self.tmp_dir.mkdir(parents=True, exist_ok=True)
         self._shards: list[Path] = []
         self._si = 0

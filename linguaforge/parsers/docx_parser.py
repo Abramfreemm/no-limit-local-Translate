@@ -30,6 +30,7 @@ from docx.text.run import Run as DocxRun
 from ..core.config import Config
 from ..core.docir import Block, BlockState, BlockType, DocIR, Origin, Page, Run, Style
 from ..core.problems import DocumentParseError
+from ..core.safeguards import guard_input
 
 # 标题样式名：Heading 1 / heading1 / 标题 1 / Titre 1 / Überschrift 1
 _RE_HEADING_NAME = re.compile(r"^\s*(?:heading|标题|標題|titre|überschrift)\s*(\d{1,2})\s*$", re.I)
@@ -96,6 +97,7 @@ class DocxParser:
         return Path(path).suffix.lower() in self.extensions
 
     def open(self, path) -> DocxParser:
+        guard_input(path, "docx")
         p = Path(path)
         if not p.exists():
             raise FileNotFoundError(f"文件不存在: {p}")

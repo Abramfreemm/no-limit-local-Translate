@@ -274,7 +274,7 @@ class OllamaProbeWorker(QThread):
         try:
             with OllamaClient(self.host, timeout=self.timeout) as client:
                 info["version"] = client.version()
-            with httpx.Client(timeout=self.timeout) as client:
+            with httpx.Client(timeout=self.timeout, trust_env=False) as client:
                 resp = client.get(f"{self.host}/api/tags")
                 resp.raise_for_status()
                 info["models"] = list(resp.json().get("models") or [])
@@ -308,7 +308,7 @@ class ModelPullWorker(QThread):
         msg = ""
         try:
             timeout = httpx.Timeout(30.0, read=None)
-            with httpx.Client(timeout=timeout) as client:
+            with httpx.Client(timeout=timeout, trust_env=False) as client:
                 with client.stream(
                     "POST",
                     f"{self.host}/api/pull",

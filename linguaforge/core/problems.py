@@ -142,6 +142,7 @@ class Code(StrEnum):
     NO_MODEL_SELECTED = "LF-U02"
     FORMAT_MISMATCH = "LF-U03"
     CANCELLED = "LF-U04"
+    BIG_DOC_ETA = "LF-U05"  # 大文档预估耗时提示（13 号 §5.2 第 7 条）
 
     # ---------- 通用兜底 ----------
     UNKNOWN = "LF-S99"
@@ -193,6 +194,7 @@ CODE_SEVERITY: dict[str, Severity] = {
     Code.NO_MODEL_SELECTED: Severity.BLOCKER,
     Code.FORMAT_MISMATCH: Severity.WARNING,
     Code.CANCELLED: Severity.INFO,
+    Code.BIG_DOC_ETA: Severity.INFO,
 }
 
 
