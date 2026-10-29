@@ -396,7 +396,7 @@ class Translator:
                 res = parse_translations(raw, n)
                 if _aligned(res, n):
                     return res
-                res2 = self._repair_missing(raw, res, n)
+                res2 = _repair_missing(raw, res, n)
                 if _aligned(res2, n):
                     self.stats.degrade_events.append("partial-parse-repair")
                     return res2
