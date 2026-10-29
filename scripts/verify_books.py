@@ -65,7 +65,7 @@ def main() -> int:
         # 预检查先行：能在开始前发现的错误不留到跑到一半
         pre = pipe.precheck()
         if pre:
-            rows.append((f.name, "阻断", 0, 0, 0.0, pre))
+            rows.append((f.name, "阻断", 0, 0, 0, 0.0, pre))
             print(f"[PRECHECK-FAIL] {f.name}")
             for line in problems_to_text(pre):
                 print(f"    {line}")
@@ -78,23 +78,24 @@ def main() -> int:
             res = pipe.run(f, out=out, fmt="markdown", page_range=rng)
             el = time.time() - t0
             status = "OK" if res.ok else "失败"
-            rows.append((f.name, status, res.pages, res.translated, el, res.errors))
+            rows.append((f.name, status, res.pages, res.translated, res.reused, el, res.errors))
         except Exception as exc:  # noqa: BLE001
             el = time.time() - t0
             from linguaforge.core.problems import from_exception
 
             pr = from_exception(exc)
-            rows.append((f.name, "异常", 0, 0, el, [pr]))
+            rows.append((f.name, "异常", 0, 0, 0, el, [pr]))
             status = "异常"
         finally:
             pipe.close()
 
-        errs = rows[-1][5]
+        errs = rows[-1][6]
         tail = ""
         if errs:
             tail = " | " + "; ".join(problems_to_text(errs)[:2])
         print(
-            f"[{status}] {f.name[:48]:<50} 页={rows[-1][2]:<4} 译={rows[-1][3]:<4} {el:6.1f}s{tail}"
+            f"[{status}] {f.name[:48]:<50} 页={rows[-1][2]:<4} "
+            f"译={rows[-1][3]:<4} 复用={rows[-1][4]:<4} {el:6.1f}s{tail}"
         )
 
     ok = sum(1 for r in rows if r[1] == "OK")

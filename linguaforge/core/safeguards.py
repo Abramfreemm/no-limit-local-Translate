@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import time
 import zipfile
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
@@ -24,8 +24,10 @@ __all__ = [
     "check_zip_safety",
     "check_image_pixels",
     "check_page_size",
+    "check_nesting_depth",
     "Deadline",
     "guard_zip",
+    "guard_page",
 ]
 
 # 所有上限集中在这里。修改时请同步更新 18 号性能预算文档。
@@ -34,10 +36,16 @@ LIMITS: dict[str, Any] = {
     "zip_max_ratio": 200,  # 压缩比上限
     "zip_max_total_bytes": 2 << 30,  # 解压后总量上限 2 GB
     "zip_max_files": 20_000,  # 条目数上限
-    # 图片像素：4 亿像素 ≈ 20000×20000，足够任何真实扫描件
-    "image_max_pixels": 400_000_000,
+    # 图片像素：1.5 亿像素 ≈ A0@300DPI 扫描件，覆盖全部真实场景。
+    # 故意设得比 Pillow 默认的 MAX_IMAGE_PIXELS（178956970）更严：
+    # 这样「150M ~ 178M」区间由本项目的检查拦截，能给出本地化文案；
+    # 超过 178M 的由 Pillow 抛 DecompressionBombError，parser 侧再映射
+    # 回同一个码 LF-D08。两条路径对外表现一致。
+    "image_max_pixels": 150_000_000,
     # PDF 页面尺寸：14400 pt = 200 英寸，超过即异常
     "page_max_pt": 14_400,
+    # 结构嵌套深度：书签树 / 页面树递归上限，防御深层嵌套导致爆栈
+    "max_nesting_depth": 64,
     # 解析总超时：默认 30 分钟
     "parse_timeout_s": 1800,
 }
@@ -111,6 +119,37 @@ def check_page_size(width: float, height: float) -> Problem | None:
             source="safeguard.page",
         )
     return None
+
+
+def check_nesting_depth(depth: int, what: str = "结构") -> Problem | None:
+    """嵌套深度上限检查（防御深层书签树 / 页面树导致递归爆栈）。"""
+    if depth > LIMITS["max_nesting_depth"]:
+        return Problem(
+            Code.STRUCT_TOO_DEEP,
+            params={"depth": depth, "max": LIMITS["max_nesting_depth"], "what": what},
+            detail=f"{what}嵌套深度 {depth} 超过上限 {LIMITS['max_nesting_depth']}",
+            source="safeguard.depth",
+        )
+    return None
+
+
+def guard_page(width: float, height: float, page_no: int | None = None) -> None:
+    """页面级防护：尺寸异常即拒绝解析。
+
+    :raises DocumentParseError: 携带 LF-D06
+    """
+    from .problems import DocumentParseError
+
+    prob = check_page_size(width, height)
+    if prob is not None:
+        prob = replace(prob, page=page_no)
+        raise DocumentParseError(
+            prob.detail,
+            code=prob.code,
+            fmt="pdf",
+            params=prob.params,
+            page=prob.page,
+        )
 
 
 def guard_zip(path: str | Path) -> Problem | None:

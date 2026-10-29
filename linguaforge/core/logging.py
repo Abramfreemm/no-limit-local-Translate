@@ -26,7 +26,15 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-__all__ = ["setup_logging", "get_logger", "redact_path", "log_dir", "LOG_FORMAT"]
+__all__ = [
+    "setup_logging",
+    "get_logger",
+    "redact_path",
+    "log_dir",
+    "crash_file",
+    "diagnostics",
+    "LOG_FORMAT",
+]
 
 LOG_FORMAT = (
     "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | "
@@ -39,6 +47,7 @@ RETENTION = "14 days"
 _COMPRESSION = "gz"
 
 _initialized = False
+_console_sink_id: int | None = None
 
 
 def log_dir() -> Path:
@@ -46,6 +55,60 @@ def log_dir() -> Path:
     from .paths import app_log_dir
 
     return app_log_dir()
+
+
+def crash_file() -> Path:
+    """崩溃日志文件路径（与常规日志同目录，便于用户一次打包发回）。"""
+    return log_dir() / "crash.log"
+
+
+def diagnostics() -> dict[str, str]:
+    """收集诊断信息：版本、平台、Python、内存、CPU、frozen 状态。
+
+    只含环境元数据，**绝不含**文档路径与正文。供崩溃日志与「关于」面板复用。
+    """
+    import os
+    import platform
+    import sys
+
+    info: dict[str, str] = {
+        "app": "LinguaForge",
+        "version": _app_version(),
+        "platform": platform.platform(),
+        "machine": platform.machine(),
+        "python": sys.version.split()[0],
+        "executable": sys.executable,
+        "frozen": str(bool(getattr(sys, "frozen", False))),
+        "cwd": os.getcwd(),
+        "pid": str(os.getpid()),
+        "cpu_count": str(os.cpu_count() or 0),
+        "memory_total_gb": "",
+        "memory_available_gb": "",
+    }
+    try:
+        import psutil
+
+        vm = psutil.virtual_memory()
+        info["memory_total_gb"] = f"{vm.total / (1 << 30):.1f}"
+        info["memory_available_gb"] = f"{vm.available / (1 << 30):.1f}"
+    except Exception:  # noqa: BLE001 —— psutil 可选，缺失不影响诊断
+        pass
+    return info
+
+
+def diagnostics_text() -> str:
+    """诊断信息的可读文本形式。"""
+    return "\n".join(f"{k:>20}: {v}" for k, v in diagnostics().items())
+
+
+def _app_version() -> str:
+    """读取应用版本；取不到时回退 dev。"""
+    try:
+        from importlib.metadata import version
+
+        return version("linguaforge")
+    except Exception:  # noqa: BLE001
+        return "dev"
 
 
 def redact_path(path: str | Path) -> str:
@@ -73,13 +136,13 @@ def _detect_level() -> str:
 def setup_logging(*, console: bool | None = None, level: str | None = None) -> Path:
     """初始化日志：文件（轮转 + 压缩）+ 可选控制台。
 
-    幂等：重复调用不会重复添加 sink。
+    幂等：重复调用不会重复添加 sink（控制台 sink 也只加一次）。
     返回日志文件所在目录，便于 UI 上「打开日志目录」。
 
     :param console: 是否输出到 stderr。缺省时按 ``sys.stderr`` 是否可用判断
                     （GUI ``console=False`` 打包时 stderr 为 None）
     """
-    global _initialized
+    global _initialized, _console_sink_id
     from loguru import logger
 
     d = log_dir()
@@ -102,9 +165,52 @@ def setup_logging(*, console: bool | None = None, level: str | None = None) -> P
     if console is None:
         console = sys.stderr is not None
     if console:
-        logger.add(sys.stderr, level="WARNING", format=LOG_FORMAT)
+        if _console_sink_id is None:
+            _console_sink_id = logger.add(sys.stderr, level="WARNING", format=LOG_FORMAT)
+    elif _console_sink_id is not None:
+        # 显式要求关闭控制台输出时，把之前加的 sink 摘掉
+        try:
+            logger.remove(_console_sink_id)
+        except Exception:  # noqa: BLE001
+            pass
+        _console_sink_id = None
 
     return d
+
+
+def log_crash(exc_type, exc, tb) -> Path:
+    """把未捕获异常写入统一崩溃日志，返回文件路径；写失败返回 ``Path("?")``。
+
+    与常规日志分开成 ``crash.log``：崩溃现场需要**完整的 traceback**（含
+    局部变量上下文），而常规日志受 ``diagnose=False`` 约束。
+    崩溃场景是用户主动排查，优先级高于脱敏。
+    """
+    import datetime
+    import traceback
+
+    path = Path("?")
+    try:
+        path = crash_file()
+        stamp = datetime.datetime.now().isoformat(timespec="seconds")
+        with open(path, "a", encoding="utf-8") as fh:
+            fh.write(f"\n==== {stamp} ====\n")
+            fh.write(f"{diagnostics_text()}\n")
+            fh.write("-" * 60 + "\n")
+            traceback.print_exception(exc_type, exc, tb, file=fh)
+    except Exception:  # noqa: BLE001 —— 兜底不能再抛
+        pass
+
+    try:
+        from loguru import logger
+
+        logger.error(
+            "未捕获异常: {}: {}",
+            getattr(exc_type, "__name__", exc_type),
+            exc,
+        )
+    except Exception:  # noqa: BLE001
+        pass
+    return path
 
 
 def get_logger(name: str = "linguaforge"):

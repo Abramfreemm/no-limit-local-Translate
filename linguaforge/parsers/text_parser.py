@@ -10,6 +10,7 @@ from collections.abc import Iterator
 from pathlib import Path
 
 from ..core.docir import Block, BlockState, BlockType, DocIR, Origin, Page, Style
+from ..core.safeguards import guard_input
 
 _RE_HEADING = re.compile(r"^(#{1,6})\s+(.*)$")
 _RE_LIST = re.compile(r"^\s*(?:[-*+•·]|\d+[.)、]|[a-zA-Z][.)])\s+(.*)$")
@@ -25,6 +26,7 @@ class TextParser:
         self.page_count = 1
 
     def open(self, path: str | Path) -> TextParser:
+        guard_input(path, "text")
         self.path = str(path)
         self.lines = Path(path).read_text(encoding="utf-8", errors="replace").splitlines()
         return self

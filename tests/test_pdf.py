@@ -8,6 +8,7 @@ import pytest
 
 from linguaforge.core.config import Config
 from linguaforge.core.docir import BlockType, Page
+from linguaforge.core.problems import Code, DocumentParseError, Severity
 from linguaforge.ocr import RapidOCREngine
 from linguaforge.parsers import PDFParser
 
@@ -83,3 +84,48 @@ def test_ocr_scan_image(scan_like_png: Path):
     blob = " ".join(b.text for b in page.blocks).lower()
     assert "efficiency" in blob or "manual" in blob
     assert all(0 <= b.confidence <= 1 for b in page.blocks)
+
+
+# ---------------- 解析护栏 ----------------
+def test_parse_timeout_is_structured(sample_pdf: Path):
+    """超时守卫触发时必须抛出带 LF-D11 的结构化错误，不能卡死或抛裸异常。"""
+    with PDFParser(Config()) as p:
+        p.open(sample_pdf)
+        # 人为把已用时间推过阈值，等价于解析耗时超限
+        p._deadline._t0 -= 10_000
+        with pytest.raises(DocumentParseError) as ei:
+            list(p.iter_pages())
+        prob = ei.value.problem
+        assert prob.code == Code.PARSE_TIMEOUT
+        assert prob.severity == Severity.FAILURE
+        assert prob.params["last_page"] == 0
+
+
+def test_oversized_page_is_skipped_not_fatal(tmp_path: Path):
+    """超大页面属于降级级：跳过该页继续，而不是让整份文档报废。"""
+    from reportlab.pdfgen import canvas
+
+    p = tmp_path / "huge.pdf"
+    # 200 英寸 ≈ 14400pt，超过 LIMITS["page_max_pt"] 的判定边界
+    c = canvas.Canvas(str(p), pagesize=(20_000, 20_000))
+    c.rect(50, 50, 200, 200, fill=0)
+    c.showPage()
+    c.save()
+
+    with PDFParser(Config()) as parser:
+        parser.open(p)
+        pages = list(parser.iter_pages())  # 不应抛出
+    assert pages == [] or len(pages) == 0
+    assert any(pr.code == Code.PAGE_SIZE_EXCEEDED for pr in parser._skipped)
+
+
+def test_deadline_reset_on_reopen(sample_pdf: Path):
+    """同一实例重复 open 时要重置计时，否则第二次开必然立刻超时。"""
+    p = PDFParser(Config())
+    p.open(sample_pdf)
+    p._deadline._t0 -= 10_000
+    assert p._deadline.expired()
+    p.close()
+    p.open(sample_pdf)
+    assert not p._deadline.expired()
+    p.close()

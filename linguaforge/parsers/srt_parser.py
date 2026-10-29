@@ -21,6 +21,7 @@ from pathlib import Path
 from ..core.config import Config
 from ..core.docir import Block, BlockState, BlockType, DocIR, Origin, Page, Style
 from ..core.problems import DocumentParseError
+from ..core.safeguards import guard_input
 
 # 时:分:秒,毫秒 --> 时:分:秒,毫秒（小时可省略，分隔符 , 或 . 均可）
 _RE_TS = re.compile(
@@ -67,6 +68,7 @@ class SrtParser:
         return Path(path).suffix.lower() in self.extensions
 
     def open(self, path) -> SrtParser:
+        guard_input(path, "srt")
         p = Path(path)
         if not p.exists():
             raise FileNotFoundError(f"文件不存在: {p}")

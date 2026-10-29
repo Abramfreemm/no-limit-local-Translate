@@ -31,6 +31,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from .health_bar import HealthBar
 from .i18n import tr
 from .preview import PreviewDialog
 from .worker import (
@@ -90,6 +91,11 @@ class TaskPage(QWidget):
 
     def _build_ui(self) -> None:
         root = QVBoxLayout(self)
+
+        # 健康条：把"Ollama 没启动"这类失败前移到用户投入成本之前（旅程 E）
+        self.health = HealthBar(self.cfg, self.main_window, self)
+        self.health.sig_action.connect(self._on_health_action)
+        root.addWidget(self.health)
 
         bar = QHBoxLayout()
         self.btn_add = QPushButton()
@@ -273,6 +279,16 @@ class TaskPage(QWidget):
             item.bar.setValue(item.progress)
 
     # ---------------------------------------------------------------- 动作
+    def _on_health_action(self, action: str) -> None:
+        """健康条上的可点击项：跳到对应页面去解决。"""
+        targets = {"model": 1, "glossary": 2, "settings": 3}
+        if self.main_window is not None:
+            self.main_window.goto_page(targets.get(action, 1))
+
+    def on_shown(self) -> None:
+        """切到本页时重跑一次环境检测（结果会随时间变化）。"""
+        self.health.refresh()
+
     def _on_add(self) -> None:
         files, _ = QFileDialog.getOpenFileNames(
             self, tr("task.add", self.lang_code), "", tr("msg.file_filter", self.lang_code)

@@ -61,7 +61,10 @@ include = ["linguaforge*"]
 [tool.ruff]
 line-length = 100
 target-version = "py311"
-exclude = [".venv", "build", "dist", "resources"]
+# 用 dist*/build* 通配：打包改用带后缀的输出目录（如 dist_final）时，
+# 写死的 "build"/"dist" 匹配不到，ruff 会把 _internal 里的第三方源码
+# 全扫一遍，冒出几百个与本项目无关的错误。
+exclude = [".venv", "build*", "dist*", "resources", "releases"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]

@@ -41,7 +41,13 @@ from pathlib import Path
 
 from .problems import Code, Problem, Severity
 
-__all__ = ["PreflightResult", "run_preflight", "check_ollama", "check_disk"]
+__all__ = [
+    "PreflightResult",
+    "run_preflight",
+    "check_ollama",
+    "check_disk",
+    "probe_ollama_version",
+]
 
 # 最低支持的 Ollama 版本（低于此版本 /api/chat 的 format 参数行为不一致）
 MIN_OLLAMA = "0.5.0"
@@ -118,6 +124,19 @@ def _ollama_installed() -> bool:
         if cand.exists():
             return True
     return False
+
+
+def probe_ollama_version(host: str, timeout: float = 3.0) -> str:
+    """探测 Ollama 版本号，失败返回空串。
+
+    供 UI 展示「已连接（0.32.15）」——只有连接正常时才需要再问一次版本，
+    因此这第二次探测只在健康态发生，成本可忽略。
+    """
+    try:
+        ver, _models = _probe_ollama(host, timeout)
+    except Exception:  # noqa: BLE001 —— 不可达时返回空串即可
+        return ""
+    return str(ver or "")
 
 
 def check_ollama(cfg) -> tuple[list[Problem], list[str]]:

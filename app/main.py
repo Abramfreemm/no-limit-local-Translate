@@ -32,19 +32,25 @@ def _setup_frozen() -> None:
 
 
 def _dump_crash(exc_type, exc, tb) -> None:
-    """兜底：崩溃信息落盘，方便用户把日志发回来。"""
-    try:
-        from platformdirs import user_data_dir
+    """兜底：崩溃落盘 + 提示，绝不"双击没反应"。
 
-        d = Path(user_data_dir("LinguaForge", "LinguaForge"))
-        d.mkdir(parents=True, exist_ok=True)
-        (d / "logs").mkdir(exist_ok=True)
-        with open(d / "logs" / "crash.log", "a", encoding="utf-8") as fh:
-            fh.write(f"\n==== {_now()} ====\n")
-            traceback.print_exception(exc_type, exc, tb, file=fh)
-        path = d / "logs" / "crash.log"
+    落盘走 :func:`linguaforge.core.logging.log_crash`，与常规日志同目录
+    （``<data>/logs/crash.log``），用户一次打包即可把现场发回来。
+
+    KeyboardInterrupt 不拦截：Ctrl-C 是正常的退出信号，不应该弹窗。
+    """
+    if issubclass(exc_type, KeyboardInterrupt):
+        sys.__excepthook__(exc_type, exc, tb)
+        return
+
+    path = Path("?")
+    try:
+        from linguaforge.core.logging import log_crash
+
+        path = log_crash(exc_type, exc, tb)
     except Exception:  # noqa: BLE001
-        path = Path("?")
+        path = _fallback_crash(exc_type, exc, tb)
+
     try:
         from PySide6.QtWidgets import QApplication, QMessageBox
 
@@ -54,8 +60,24 @@ def _dump_crash(exc_type, exc, tb) -> None:
             "LinguaForge 遇到未处理的错误",
             f"{exc_type.__name__}: {exc}\n\n详细信息已写入：\n{path}",
         )
-    except Exception:  # noqa: BLE001
+    except Exception:  # noqa: BLE001 —— 无 GUI / 离屏时退回默认钩子
         sys.__excepthook__(exc_type, exc, tb)
+
+
+def _fallback_crash(exc_type, exc, tb) -> Path:
+    """统一日志模块也挂了时的最后手段：直接写到用户数据目录。"""
+    try:
+        from platformdirs import user_data_dir
+
+        d = Path(user_data_dir("LinguaForge", "LinguaForge")) / "logs"
+        d.mkdir(parents=True, exist_ok=True)
+        p = d / "crash.log"
+        with open(p, "a", encoding="utf-8") as fh:
+            fh.write(f"\n==== {_now()} ====\n")
+            traceback.print_exception(exc_type, exc, tb, file=fh)
+        return p
+    except Exception:  # noqa: BLE001
+        return Path("?")
 
 
 def _now() -> str:
@@ -87,9 +109,30 @@ def _is_cli() -> bool:
     return "cli" in name
 
 
+def _bootstrap() -> None:
+    """启动时的一次性初始化：日志落盘 + 残留分片清扫。
+
+    两者都吞异常——它们属于"锦上添花"，绝不能挡住主流程启动。
+    """
+    sys.excepthook = _dump_crash  # 越早装越好，下面的初始化出错也能被兜住
+    try:
+        from linguaforge.core.logging import setup_logging
+
+        # GUI（console=False）下 stderr 为 None，这里显式关掉控制台 sink
+        setup_logging(console=_is_cli())
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        from linguaforge.core.paths import sweep_orphan_tmpdirs
+
+        sweep_orphan_tmpdirs()
+    except Exception:  # noqa: BLE001
+        pass
+
+
 def main() -> int:
     _setup_frozen()
-    sys.excepthook = _dump_crash
+    _bootstrap()
 
     if _is_cli():
         # 命令行：保持调用者的工作目录，相对路径才符合用户预期

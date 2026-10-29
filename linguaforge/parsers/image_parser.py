@@ -19,8 +19,8 @@ from pathlib import Path
 
 from ..core.config import Config
 from ..core.docir import DocIR, Page
-from ..core.problems import DocumentParseError
-from ..core.safeguards import guard_input
+from ..core.problems import Code, DocumentParseError
+from ..core.safeguards import check_image_pixels, guard_input
 
 _DEFAULT_DPI = 96.0
 
@@ -75,16 +75,31 @@ class ImageParser:
             )
         try:
             from PIL import Image
+        except ImportError as e:
+            raise ImageParseError(f"缺少 Pillow，无法读取图片：{e}") from e
 
+        try:
             with Image.open(str(p)) as im:
                 self._px = (int(im.size[0]), int(im.size[1]))
                 dpi = im.info.get("dpi") if isinstance(im.info, dict) else None
-        except ImportError as e:
-            raise ImageParseError(f"缺少 Pillow，无法读取图片：{e}") from e
+        except Image.DecompressionBombError as e:
+            # Pillow 自带的炸弹保护（默认 178956970 像素）比本项目更宽松地
+            # 先触发，这里统一映射回 LF-D08，保证错误码不漂移。
+            raise ImageParseError(
+                f"图片尺寸过大，已拒绝打开：{p.name}: {e}",
+                code=Code.IMAGE_TOO_LARGE,
+                params={"w": 0, "h": 0},
+            ) from e
         except Exception as e:
             raise ImageParseError(f"无法读取图片：{p.name}（文件损坏或格式不受支持）: {e}") from e
         if self._px[0] <= 0 or self._px[1] <= 0:
             raise ImageParseError(f"图片尺寸非法：{p.name} -> {self._px}")
+
+        # 护栏：图片炸弹。声明 200000×200000 的图会让后续解码一次性吃掉数十 GB。
+        # 必须在真正解码（load / OCR）之前拦，只看头部尺寸即可判定。
+        prob = check_image_pixels(*self._px)
+        if prob is not None:
+            raise ImageParseError(prob.detail, code=prob.code, params=prob.params)
 
         dpi_x = float(dpi[0]) if isinstance(dpi, (tuple, list)) and dpi and dpi[0] else _DEFAULT_DPI
         if dpi_x <= 0:

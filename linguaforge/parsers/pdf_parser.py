@@ -11,13 +11,15 @@ import re
 from collections import Counter
 from collections.abc import Iterator, Sequence
 from pathlib import Path
+from typing import Any
 
 import pdfplumber
 from pypdf import PdfReader
 
 from ..core.config import Config
 from ..core.docir import Block, BlockState, BlockType, DocIR, Origin, Page, Run, Style
-from ..core.safeguards import guard_input
+from ..core.problems import DocumentParseError
+from ..core.safeguards import LIMITS, Deadline, check_nesting_depth, guard_input, guard_page
 
 # 行首有序/无序列表标记
 _RE_LIST = re.compile(
@@ -139,7 +141,13 @@ class PDFParser:
             ...
     """
 
-    def __init__(self, config: Config | None = None) -> None:
+    def __init__(
+        self,
+        config: Config | None = None,
+        *,
+        timeout_s: float | None = None,
+        deadline: Deadline | None = None,
+    ) -> None:
         self.cfg = config or Config()
         self._pdf: pdfplumber.PDF | None = None
         self._reader: PdfReader | None = None
@@ -149,11 +157,18 @@ class PDFParser:
         self._footer_fp: set[str] = set()
         self._body_size: float = 10.0
         self._title: str = ""
+        #: 因降级级问题被跳过的页面（LF-D06 等），供上层汇总展示
+        self._skipped: list = []
+        # 超时守卫：外部传入便于单测注入；否则按 LIMITS 建一个，open() 时重置
+        self._deadline = deadline or Deadline(
+            float(timeout_s) if timeout_s is not None else float(LIMITS["parse_timeout_s"])
+        )
 
     # ---------------- 生命周期 ----------------
     def open(self, path: str | Path) -> PDFParser:
         guard_input(path, "pdf")
         self.path = str(path)
+        self._deadline = Deadline(self._deadline.timeout_s)  # 每次 open 重置计时
         self._pdf = pdfplumber.open(self.path)
         self.page_count = len(self._pdf.pages)
         try:
@@ -238,10 +253,14 @@ class PDFParser:
     def parse_page(self, index: int) -> Page:
         assert self._pdf is not None, "parser not opened"
         pl = self._pdf.pages[index]
+        width = float(pl.width or 595.0)
+        height = float(pl.height or 842.0)
+        # 护栏：超大页面会让渲染一次性分配巨额内存，直接拒绝而不是 OOM
+        guard_page(width, height, index)
         page = Page(
             index=index,
-            width=float(pl.width or 595.0),
-            height=float(pl.height or 842.0),
+            width=width,
+            height=height,
             rotation=int(getattr(pl, "rotation", 0) or 0),
         )
         try:
@@ -293,10 +312,32 @@ class PDFParser:
         return page
 
     def iter_pages(self, start: int = 0, end: int | None = None) -> Iterator[Page]:
-        """流式产出页面。绝不一次性构造全部 Page。"""
+        """流式产出页面。绝不一次性构造全部 Page。
+
+        每页前检查总超时（LF-D11）：恶意构造的 PDF 可能让单页解析无限期
+        卡住，靠"总时长"而不是"单页时长"兜底，既防卡死又误伤正常大页。
+
+        单页失败时按严重级分流：降级级（如页面尺寸超限）跳过该页继续，
+        失败级才向上传播 —— 一份 800 页的手册不该因为其中一页异常而整本报废。
+        """
         end = self.page_count if end is None else min(end, self.page_count)
         for i in range(start, end):
-            yield self.parse_page(i)
+            if self._deadline.expired():
+                prob = self._deadline.problem(last_page=i)
+                raise DocumentParseError(
+                    prob.detail,
+                    code=prob.code,
+                    fmt="pdf",
+                    params=prob.params,
+                )
+            try:
+                page = self.parse_page(i)
+            except DocumentParseError as exc:
+                if exc.problem is not None and not exc.problem.is_fatal:
+                    self._skipped.append(exc.problem)
+                    continue
+                raise
+            yield page
 
     # ---------------- 块构建 ----------------
     def _build_blocks(self, words: Sequence[dict], pno: int, page_h: float) -> list[Block]:
@@ -490,13 +531,23 @@ class PDFParser:
         page.blocks = ordered
 
     def outline(self) -> list[dict]:
-        """书签（目录）"""
+        """书签（目录）。
+
+        pypdf 返回的是**嵌套列表**（子书签是父书签的列表元素），直接递归
+        展开遇到恶意构造的深嵌套会爆栈，因此这里迭代展开并做深度上限检查。
+        """
         if self._reader is None:
             return []
         try:
-            return self._reader.outline or []
+            raw = self._reader.outline or []
         except Exception:
             return []
+        return _flatten_outline(raw, self._reader)
+
+    @property
+    def elapsed_s(self) -> float:
+        """已用解析时长（秒），供进度与超时诊断使用。"""
+        return self._deadline.elapsed_s
 
     def to_docir(self, max_pages: int | None = None) -> DocIR:
         """把整份文档读成 DocIR（仅用于小文件 / 单测；生产请走 iter_pages）。"""
@@ -508,6 +559,39 @@ class PDFParser:
         for p in self.iter_pages(end=max_pages):
             doc.pages.append(p)
         return doc
+
+
+def _flatten_outline(items, reader, max_depth: int = 64) -> list[dict]:
+    """把 pypdf 的嵌套书签树迭代展开为扁平列表，带深度上限（LF-D09）。
+
+    pypdf 的 outline 形如 ``[bookmark, [child1, child2], bookmark2, ...]``，
+    子书签直接嵌套在父书签之后。
+
+    :raises DocumentParseError: 嵌套超过 ``max_depth``
+    """
+    out: list[dict] = []
+    # 栈里存 (节点, 深度)；reversed 保证按原顺序出栈
+    stack: list[tuple[Any, int]] = [(item, 1) for item in reversed(list(items))]
+    while stack:
+        item, depth = stack.pop()
+        if depth > max_depth:
+            prob = check_nesting_depth(depth, what="书签")
+            assert prob is not None
+            raise DocumentParseError(prob.detail, code=prob.code, fmt="pdf", params=prob.params)
+        if isinstance(item, list):
+            # 子书签列表：展开为下一层
+            stack.extend((sub, depth + 1) for sub in reversed(item))
+            continue
+        title = str(getattr(item, "title", "") or "")
+        if not title:
+            continue
+        page_no = None
+        try:
+            page_no = int(reader.get_destination_page_number(item)) + 1
+        except Exception:  # noqa: BLE001 —— 书签指向失效，不影响其它条目
+            page_no = None
+        out.append({"level": depth, "title": title, "page": page_no})
+    return out
 
 
 class _Line:

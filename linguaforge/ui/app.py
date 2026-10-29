@@ -6,15 +6,14 @@
 from __future__ import annotations
 
 import argparse
-import logging
 import sys
 import traceback
-from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
 from PySide6.QtWidgets import QApplication, QMessageBox
 
-from ..core.config import Config, default_data_dir
+from ..core.config import Config
+from ..core.logging import get_logger, log_crash, setup_logging
 
 try:  # QtNetwork 可能随发行版裁剪，缺失时优雅降级为「不做单实例」
     from PySide6.QtNetwork import QLocalServer, QLocalSocket
@@ -36,26 +35,16 @@ _STATE: dict = {}
 
 
 # ---------------------------------------------------------------- 日志
-def setup_logging() -> Path:
-    """把日志落到用户数据目录，返回日志文件路径。"""
-    log_dir = default_data_dir() / "logs"
-    log_dir.mkdir(parents=True, exist_ok=True)
-    log_path = log_dir / "linguaforge-ui.log"
+def init_logging() -> Path:
+    """把日志落到统一目录，返回日志**目录**。
 
-    root = logging.getLogger("linguaforge")
-    root.setLevel(logging.DEBUG)
-    for handler in list(root.handlers):
-        if isinstance(handler, RotatingFileHandler):
-            break
-    else:
-        handler = RotatingFileHandler(
-            log_path, maxBytes=2 * 1024 * 1024, backupCount=3, encoding="utf-8"
-        )
-        handler.setFormatter(
-            logging.Formatter("%(asctime)s [%(levelname)s] %(threadName)s %(name)s: %(message)s")
-        )
-        root.addHandler(handler)
-    return log_path
+    实现委托给 :func:`linguaforge.core.logging.setup_logging`（loguru，
+    10 MB 轮转 / 14 天保留 / gz 压缩 / 多进程安全 / diagnose=False）。
+
+    GUI 以 ``console=False`` 打包时 stderr 为 None，因此这里显式关掉
+    控制台 sink —— 既避免 loguru 往空句柄写，也避免污染 CLI 输出。
+    """
+    return setup_logging(console=False)
 
 
 # ---------------------------------------------------------------- 异常兜底
@@ -83,18 +72,21 @@ def _show_crash_dialog(text: str) -> None:
 
 
 def install_excepthook() -> None:
-    """接管 sys.excepthook：写日志 + 弹一次提示，绝不静默崩溃。"""
+    """接管 sys.excepthook：写崩溃日志 + 弹一次提示，绝不静默崩溃。"""
 
     def _hook(exc_type, exc, tb) -> None:
         if issubclass(exc_type, KeyboardInterrupt):
             sys.__excepthook__(exc_type, exc, tb)
             return
         text = "".join(traceback.format_exception(exc_type, exc, tb))
-        logging.getLogger(LOGGER_NAME).error("未捕获异常:\n%s", text)
+        try:
+            log_crash(exc_type, exc, tb)
+        except Exception as diag_exc:  # noqa: BLE001 —— 兜底不能再抛
+            get_logger(LOGGER_NAME).error("崩溃落盘失败: {}", diag_exc)
         try:
             _show_crash_dialog(text)
         except Exception as diag_exc:  # noqa: BLE001 —— 兜底不能再抛
-            logging.getLogger(LOGGER_NAME).error("崩溃弹窗失败: %s", diag_exc)
+            get_logger(LOGGER_NAME).error("崩溃弹窗失败: {}", diag_exc)
 
     sys.excepthook = _hook
 
@@ -118,13 +110,13 @@ def _acquire_single_instance(name: str = _SERVER_NAME) -> tuple[bool, object | N
             sock.waitForBytesWritten(300)
             sock.disconnectFromServer()
         except OSError as exc:
-            logging.getLogger(LOGGER_NAME).warning("通知已有实例失败: %s", exc)
+            get_logger(LOGGER_NAME).warning("通知已有实例失败: {}", exc)
         return False, None
 
     QLocalServer.removeServer(name)
     server = QLocalServer()
     if not server.listen(name):
-        logging.getLogger(LOGGER_NAME).warning("单实例监听失败: %s", server.errorString())
+        get_logger(LOGGER_NAME).warning("单实例监听失败: {}", server.errorString())
         return True, None
     return True, server
 
@@ -149,10 +141,10 @@ def _parse_args(argv: list | None) -> argparse.Namespace:
 def main(argv=None) -> int:
     """GUI 入口，返回进程退出码。"""
     args = _parse_args(argv)
-    log_path = setup_logging()
-    log = logging.getLogger(LOGGER_NAME)
+    log_dir = init_logging()
+    log = get_logger(LOGGER_NAME)
     install_excepthook()
-    log.info("启动 LinguaForge UI，日志文件: %s", log_path)
+    log.info("启动 LinguaForge UI，日志目录: {}", log_dir)
 
     argv_list = list(sys.argv if argv is None else ["linguaforge-ui", *argv])
     app = QApplication.instance() or QApplication(argv_list)
@@ -185,6 +177,6 @@ def main(argv=None) -> int:
     try:
         cfg.save()
     except OSError as exc:
-        log.error("配置保存失败: %s", exc)
-    log.info("退出，code=%s", code)
+        log.error("配置保存失败: {}", exc)
+    log.info("退出，code={}", code)
     return int(code)

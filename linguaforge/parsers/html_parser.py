@@ -26,6 +26,7 @@ from bs4 import BeautifulSoup, NavigableString, Tag
 from ..core.config import Config
 from ..core.docir import Block, BlockState, BlockType, DocIR, Origin, Page, Run, Style
 from ..core.problems import DocumentParseError
+from ..core.safeguards import guard_input
 
 _SKIP_TAGS = {"script", "style", "noscript", "template", "svg", "iframe", "head"}
 _HEADING_TAGS = {"h1": 1, "h2": 2, "h3": 3, "h4": 4, "h5": 5, "h6": 6}
@@ -69,6 +70,7 @@ class HtmlParser:
         return Path(path).suffix.lower() in self.extensions
 
     def open(self, path) -> HtmlParser:
+        guard_input(path, "html")
         p = Path(path)
         if not p.exists():
             raise FileNotFoundError(f"文件不存在: {p}")

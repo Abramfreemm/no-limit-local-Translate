@@ -80,3 +80,7 @@ resources/fonts/*.ttf
 resources/fonts/*.otf
 resources/ocr_models/
 packaging/win/Output/
+
+# ---------- 最新一次打包输出（新目录，避免覆盖旧 dist 触发批量删除确认） ----------
+dist_final/
+build_final/
