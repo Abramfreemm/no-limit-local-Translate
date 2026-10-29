@@ -52,7 +52,7 @@ runs:
         set -e
         echo "$out"
         if [ "$code" -eq 0 ]; then
-          echo "✅ 依赖完整，无冲突"
+          echo "[OK] 依赖完整，无冲突"
           exit 0
         fi
         unexpected=$(printf '%s\n' "$out" \
@@ -62,10 +62,16 @@ runs:
           echo "::error::存在未解决的依赖冲突"
           exit 1
         fi
-        echo "✅ 仅剩已知的 opencv-python/headless 例外"
+        echo "[OK] 仅剩已知的 opencv-python/headless 例外"
 
     - name: 许可合规 · 无强传染性 / 非商用许可
       shell: bash
+      env:
+        # Windows runner 的 Python stdout 默认 cp1252，打印中文/符号会
+        # UnicodeEncodeError 直接让步骤失败。pytest 步骤早已设了这两个变量，
+        # 这里补齐（文案也一并换成 ASCII 标记，双保险）。
+        PYTHONIOENCODING: utf-8
+        PYTHONUTF8: "1"
       # 与 09 号合规清单第 1 节一致。这里不用 pip-licenses --fail-on，
       # 因为它是子串匹配，"GPL" 会误伤 PySide6 的 LGPL-3.0（动态链接，允许）。
       # 改为脚本精确判定：AGPL / 非 LGPL 的 GPL / NC / Nonstandard 才阻断。
@@ -101,7 +107,7 @@ runs:
             for n, l, why in bad:
                 print(f"::error::{n} = {l} → {why}")
             sys.exit(1)
-        print("✅ 无强传染性 / 非商用许可依赖")
+        print("[OK] 无强传染性 / 非商用许可依赖")
         PY
 
     - name: 依赖漏洞 · pip-audit
