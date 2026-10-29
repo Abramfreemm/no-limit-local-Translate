@@ -23,8 +23,10 @@ from linguaforge.core.config import Config  # noqa: E402
 from linguaforge.core.problems import problems_to_text  # noqa: E402
 from linguaforge.pipeline import SUPPORTED_IN, Pipeline  # noqa: E402
 
+#: 默认真实书目录（仅本机存在，CI 上不会用到，调用时必须显式传 --dir）
 DEFAULT_DIR = Path("D:/A-小匠/workbuddyproject/英文版-待翻译测试")
-DEFAULT_OUT = Path("D:/lfdev/out_test")
+#: 默认输出放在仓库内（已 gitignore），避免指向仓库外的不存在路径
+DEFAULT_OUT = Path(__file__).resolve().parents[1] / "out_test"
 
 
 def parse_range(text: str) -> tuple[int, int] | None:

@@ -7,14 +7,16 @@
 #define MyAppChineseName "译匠"
 #define MyAppVersion "0.1.0"
 #define MyAppPublisher "LinguaForge"
-#define MyAppURL "https://github.com/<owner>/linguaforge"
+#define MyAppURL "https://github.com/Abramfreemm/no-limit-local-Translate"
 #define MyAppExeName "LinguaForge.exe"
 ; 约定：PyInstaller 统一输出到 dist_v2（CI 与本地一致，见 .github/workflows/release.yml）。
 ; 不用 dist/ 是因为 PyInstaller 重建时会先删旧目录，在受管控环境里会触发批量删除确认。
 #define MySourceDir "..\..\dist_v2\LinguaForge"
 
 [Setup]
-AppId={{A7C3E1D0-5B4A-4F2E-9C8D-LINGUAFORGE01}
+; AppId 必须是合法 GUID（双大括号是 Inno 的转义）。改它 = 换一个"新软件"，
+; 已装用户将无法升级而是并存安装，故 0.1.0 定稿后不再改动。
+AppId={{F3A1B2C4-8D5E-4A7B-9C1D-2E3F4A5B6C7D}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppVerName={#MyAppName} {#MyAppVersion}
