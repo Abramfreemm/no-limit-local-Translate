@@ -35,12 +35,12 @@ ui/  →  pipeline.py  →  parsers/ writers/ translate/ ocr.py  →  core/
 ```python
 # ✅ 唯一正确写法
 p = Path(raw).expanduser().resolve()
-name = p.name  # 只取文件名，天然隔离分隔符
+name = p.name                    # 只取文件名，天然隔离分隔符
 out = src.with_name(f"{src.stem}.{lang}{src.suffix}")
 
 # ❌ 禁止
-out = src.parent / (str(src.name).replace(".pdf", ".zh.pdf"))  # 字符串替换，遇到 .pdf.pdf 出错
-open(f"{dir}/{name}")  # 手拼斜杠
+out = src.parent / (str(src.name).replace(".pdf", ".zh.pdf"))   # 字符串替换，遇到 .pdf.pdf 出错
+open(f"{dir}/{name}")                                            # 手拼斜杠
 ```
 
 **必须处理的三类文件名**：
@@ -57,7 +57,7 @@ open(f"{dir}/{name}")  # 手拼斜杠
 raise DocumentParseError(Problem("LF-D05", Severity.F, {"name": src.name}, detail=str(e)))
 
 # ❌
-raise DocxParseError(f"DOCX 解析失败：{p.name}: {e}")  # 6 个类各自演化，UI 只能显示原始字符串
+raise DocxParseError(f"DOCX 解析失败：{p.name}: {e}")   # 6 个类各自演化，UI 只能显示原始字符串
 ```
 
 - 禁止裸 `except:`；`except Exception as e` 必须带 `# noqa: BLE001` + 一行说明为什么不具体。
@@ -69,8 +69,6 @@ raise DocxParseError(f"DOCX 解析失败：{p.name}: {e}")  # 6 个类各自演�
 ```python
 # ✅ 列名白名单 + 值参数化
 _ALLOWED = frozenset({"status", "error", "updated_at"})
-
-
 def update_task(self, task_id: str, **fields):
     bad = set(fields) - _ALLOWED
     if bad:
