@@ -38,15 +38,27 @@ runs:
 
     - name: 依赖完整性 · pip check
       shell: bash
-      # 已知例外：rapidocr-onnxruntime 硬声明 opencv-python，而我们安装的是
-      # headless 版（模块名同为 cv2，但不捆绑 Qt，避免与 PySide6 的 Qt 冲突）。
+      # 用退出码判定，不猜输出内容。
+      # 初版写成「输出里没有多余的行就通过」，结果 CI 上 pip check 无冲突时
+      # 会打印 "No broken requirements found."，被当成冲突，导致门禁恒红。
+      #
+      # 已知例外：rapidocr-onnxruntime 硬声明 opencv-python，而我们装的是
+      # headless 版（模块名同为 cv2，不捆绑 Qt，避免与 PySide6 的 Qt 冲突）。
       # 除这一条外的任何其他缺失依赖都必须让 CI 变红。
       run: |
-        set -o pipefail
-        out=$(pip check 2>&1 || true)
+        set +e
+        out=$(pip check 2>&1)
+        code=$?
+        set -e
         echo "$out"
-        filtered=$(echo "$out" | grep -v "requires opencv-python, which is not installed" | grep -v "^$" || true)
-        if [ -n "$filtered" ]; then
+        if [ "$code" -eq 0 ]; then
+          echo "✅ 依赖完整，无冲突"
+          exit 0
+        fi
+        unexpected=$(printf '%s\n' "$out" \
+          | grep -v 'requires opencv-python, which is not installed' \
+          | grep -v '^$' || true)
+        if [ -n "$unexpected" ]; then
           echo "::error::存在未解决的依赖冲突"
           exit 1
         fi
@@ -61,24 +73,36 @@ runs:
         pip-licenses --format=csv --with-urls --output-file=licenses.csv
         python - <<'PY'
         import csv, sys
+
+        # 构建期工具白名单：它们不随安装包分发。
+        # PyInstaller 是 GPLv2 + bootloader exception，该例外明确允许把专有程序
+        # 打包成 exe；本项目只把它当构建工具，产物里只有 bootloader。
+        # CI 的 quality-gate 环境里并不会装它们（只有 release 的 build job 才装），
+        # 但开发者本地环境通常有 —— 没有白名单就会出现「本地红、CI 绿」的困惑。
+        BUILD_TOOLS = {"pyinstaller", "pyinstaller-hooks-contrib"}
+
         bad = []
         with open("licenses.csv", encoding="utf-8") as fh:
-            for row in csv.DictReader(fh):
-                lic = (row.get("License") or "").strip()
-                low = lic.lower()
-                if "agpl" in low:
-                    bad.append((row["Name"], lic, "AGPL 强传染"))
-                elif "gpl" in low and "lgpl" not in low:
-                    bad.append((row["Name"], lic, "GPL 强传染（非 LGPL）"))
-                elif "nc" == low or "non-commercial" in low or "noncommercial" in low:
-                    bad.append((row["Name"], lic, "非商用限制"))
-                elif low.startswith("nonstandard") or "proprietary" in low:
-                    bad.append((row["Name"], lic, "非标准/专有"))
+            rows = list(csv.DictReader(fh))
+        for row in rows:
+            if (row.get("Name") or "").strip().lower() in BUILD_TOOLS:
+                continue
+            lic = (row.get("License") or "").strip()
+            low = lic.lower()
+            if "agpl" in low:
+                bad.append((row["Name"], lic, "AGPL 强传染"))
+            elif "gpl" in low and "lgpl" not in low:
+                bad.append((row["Name"], lic, "GPL 强传染（非 LGPL）"))
+            elif "nc" == low or "non-commercial" in low or "noncommercial" in low:
+                bad.append((row["Name"], lic, "非商用限制"))
+            elif low.startswith("nonstandard") or "proprietary" in low:
+                bad.append((row["Name"], lic, "非标准/专有"))
         if bad:
             for n, l, why in bad:
                 print(f"::error::{n} = {l} → {why}")
             sys.exit(1)
         print("✅ 无强传染性 / 非商用许可依赖")
+        PY
         PY
 
     - name: 依赖漏洞 · pip-audit

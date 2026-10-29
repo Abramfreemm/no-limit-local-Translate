@@ -88,3 +88,6 @@ build_final/
 # ---------- 本地验证输出（scripts/verify_books.py 默认写这里） ----------
 out_test/
 out_books*/
+
+# 门禁产物
+licenses.csv
