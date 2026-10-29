@@ -20,6 +20,7 @@ from pathlib import Path
 
 from ..core.config import Config
 from ..core.docir import Block, BlockState, BlockType, DocIR, Origin, Page, Style
+from ..core.problems import DocumentParseError
 
 # 时:分:秒,毫秒 --> 时:分:秒,毫秒（小时可省略，分隔符 , 或 . 均可）
 _RE_TS = re.compile(
@@ -30,8 +31,16 @@ _RE_TS = re.compile(
 _RE_INT = re.compile(r"^\d+$")
 
 
-class SrtParseError(RuntimeError):
-    """字幕解析失败（空文件 / 无有效时间轴）。"""
+class SrtParseError(DocumentParseError):
+    """SRT 解析失败。
+
+    ADR-016：原 6 个 ``*ParseError`` 除名字外完全一致却各自演化，
+    现统一继承 :class:`~linguaforge.core.problems.DocumentParseError`，
+    仅保留 ``fmt="srt"`` 作为格式标签，上层可一次捕获。
+    """
+
+    def __init__(self, message: str = "", **kw) -> None:
+        super().__init__(message, fmt="srt", **kw)
 
 
 class SrtParser:

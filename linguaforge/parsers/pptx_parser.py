@@ -24,13 +24,22 @@ from pptx.util import Emu
 
 from ..core.config import Config
 from ..core.docir import Block, BlockState, BlockType, DocIR, Origin, Page, Run, Style
+from ..core.problems import DocumentParseError
 
 EMU_PER_PT = 12700.0
 _DEFAULT_BBOX = (0.0, 0.0, 0.0, 0.0)
 
 
-class PptxParseError(RuntimeError):
-    """PPTX 解析失败（文件损坏或不是合法 OOXML 包）。"""
+class PptxParseError(DocumentParseError):
+    """PPTX 解析失败。
+
+    ADR-016：原 6 个 ``*ParseError`` 除名字外完全一致却各自演化，
+    现统一继承 :class:`~linguaforge.core.problems.DocumentParseError`，
+    仅保留 ``fmt="pptx"`` 作为格式标签，上层可一次捕获。
+    """
+
+    def __init__(self, message: str = "", **kw) -> None:
+        super().__init__(message, fmt="pptx", **kw)
 
 
 class PptxParser:

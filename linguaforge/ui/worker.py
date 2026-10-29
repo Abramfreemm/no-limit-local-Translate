@@ -21,6 +21,7 @@ import httpx
 from PySide6.QtCore import QThread, Signal
 
 from ..core.config import Config
+from ..core.problems import problems_to_text
 from ..pipeline import OUT_EXT, SUPPORTED_IN, Pipeline, PipelineResult
 from ..translate.ollama_client import OllamaClient
 
@@ -245,7 +246,7 @@ class TranslateWorker(QThread):
             self.sig_item_done.emit(row, res)
         else:
             self._fail += 1
-            self.sig_item_error.emit(row, "; ".join(res.errors) or "未知错误")
+            self.sig_item_error.emit(row, "; ".join(problems_to_text(res.errors)) or "未知错误")
 
     # ---- 回调 ----
     def _log(self, text: str) -> None:

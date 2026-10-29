@@ -25,6 +25,7 @@ from typing import Any
 
 from .core.config import Config
 from .core.docir import Block, BlockState, BlockType, Page
+from .core.problems import Code, Problem, from_exception
 from .ocr import RapidOCREngine
 from .parsers import PDFParser, TextParser
 from .parsers.render import PDFRenderer
@@ -68,7 +69,7 @@ class PipelineResult:
     model: str = ""
     task_id: str = ""
     stats: TranslateStats | None = None
-    errors: list[str] = field(default_factory=list)
+    errors: list[Problem] = field(default_factory=list)
 
     def summary(self) -> str:
         s = self.stats
@@ -329,14 +330,27 @@ class Pipeline:
         t0 = time.time()
         src = Path(src)
         if not src.exists():
-            return PipelineResult(ok=False, source=str(src), errors=[f"文件不存在: {src}"])
+            return PipelineResult(
+                ok=False,
+                source=str(src),
+                errors=[Problem(Code.FILE_NOT_FOUND, params={"name": src.name})],
+            )
 
         ext = src.suffix.lower()
         fmt = (fmt or self.cfg.output.fmt or "markdown").lower()
         if fmt == "txt":
             fmt = "text"
         if fmt not in OUT_EXT:
-            return PipelineResult(ok=False, source=str(src), errors=[f"不支持的输出格式: {fmt}"])
+            return PipelineResult(
+                ok=False,
+                source=str(src),
+                errors=[
+                    Problem(
+                        Code.EXT_UNSUPPORTED,
+                        params={"ext": fmt, "list": ", ".join(sorted(OUT_EXT))},
+                    )
+                ],
+            )
         bilingual = self.cfg.output.bilingual
         if ext in TEXT_EXT and fmt == "markdown":
             fmt = "markdown"
@@ -359,7 +373,15 @@ class Pipeline:
                 return PipelineResult(
                     ok=False,
                     source=str(src),
-                    errors=[f"暂不支持的格式: {ext}（支持：{', '.join(sorted(SUPPORTED_IN))}）"],
+                    errors=[
+                        Problem(
+                            Code.EXT_UNSUPPORTED,
+                            params={
+                                "ext": ext or "(无扩展名)",
+                                "list": ", ".join(sorted(SUPPORTED_IN)),
+                            },
+                        )
+                    ],
                 )
             parser.open(src)
             total = parser.page_count
@@ -370,7 +392,11 @@ class Pipeline:
                 except Exception as e:  # noqa: BLE001
                     self.log(f"[render] 初始化失败：{e}")
         except Exception as e:  # noqa: BLE001
-            return PipelineResult(ok=False, source=str(src), errors=[f"打开失败: {e}"])
+            return PipelineResult(
+                ok=False,
+                source=str(src),
+                errors=[from_exception(e, params={"fmt": ext}, source="pipeline.open")],
+            )
 
         # ---------------- 续翻准备 ----------------
         task_id = ""
@@ -444,13 +470,20 @@ class Pipeline:
 
             for page in parser.iter_pages(p0, p1):
                 if cancel and cancel():
-                    res.errors.append("用户取消")
+                    res.errors.append(Problem(Code.CANCELLED))
                     break
                 try:
                     if renderer and page.meta.get("need_ocr") and self.cfg.ocr.enabled:
                         self._do_ocr(page, renderer)
                 except Exception as e:  # noqa: BLE001
-                    res.errors.append(f"p{page.index + 1} OCR 失败: {e}")
+                    res.errors.append(
+                        Problem(
+                            Code.OCR_MODEL_BROKEN,
+                            params={"page": page.index + 1},
+                            detail=str(e),
+                            page=page.index + 1,
+                        )
+                    )
 
                 window.append(page)
                 window_chars += sum(len(b.text) for b in page.blocks)
@@ -484,7 +517,7 @@ class Pipeline:
                     )
                     window, window_chars = [], 0
                     if cancel and cancel():
-                        res.errors.append("用户取消")
+                        res.errors.append(Problem(Code.CANCELLED))
                         break
 
             if window:
@@ -519,7 +552,7 @@ class Pipeline:
             if on_progress:
                 on_progress("done", pages_done, total, "完成")
         except Exception as e:  # noqa: BLE001
-            res.errors.append(f"写出失败: {e}")
+            res.errors.append(Problem(Code.WRITE_FAILED, params={"fmt": fmt}, detail=str(e)))
             res.ok = False
             if st is not None and task_id:
                 try:

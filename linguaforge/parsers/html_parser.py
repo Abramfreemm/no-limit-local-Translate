@@ -25,6 +25,7 @@ from bs4 import BeautifulSoup, NavigableString, Tag
 
 from ..core.config import Config
 from ..core.docir import Block, BlockState, BlockType, DocIR, Origin, Page, Run, Style
+from ..core.problems import DocumentParseError
 
 _SKIP_TAGS = {"script", "style", "noscript", "template", "svg", "iframe", "head"}
 _HEADING_TAGS = {"h1": 1, "h2": 2, "h3": 3, "h4": 4, "h5": 5, "h6": 6}
@@ -33,8 +34,16 @@ _CELL_TAGS = ("td", "th")
 _ZERO_BBOX = (0.0, 0.0, 0.0, 0.0)
 
 
-class HtmlParseError(RuntimeError):
-    """HTML / Markdown 解析失败。"""
+class HtmlParseError(DocumentParseError):
+    """HTML 解析失败。
+
+    ADR-016：原 6 个 ``*ParseError`` 除名字外完全一致却各自演化，
+    现统一继承 :class:`~linguaforge.core.problems.DocumentParseError`，
+    仅保留 ``fmt="html"`` 作为格式标签，上层可一次捕获。
+    """
+
+    def __init__(self, message: str = "", **kw) -> None:
+        super().__init__(message, fmt="html", **kw)
 
 
 class HtmlParser:

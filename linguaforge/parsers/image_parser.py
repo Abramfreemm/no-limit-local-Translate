@@ -19,12 +19,21 @@ from pathlib import Path
 
 from ..core.config import Config
 from ..core.docir import DocIR, Page
+from ..core.problems import DocumentParseError
 
 _DEFAULT_DPI = 96.0
 
 
-class ImageParseError(RuntimeError):
-    """图片读取失败（格式不支持或文件损坏）。"""
+class ImageParseError(DocumentParseError):
+    """IMAGE 解析失败。
+
+    ADR-016：原 6 个 ``*ParseError`` 除名字外完全一致却各自演化，
+    现统一继承 :class:`~linguaforge.core.problems.DocumentParseError`，
+    仅保留 ``fmt="image"`` 作为格式标签，上层可一次捕获。
+    """
+
+    def __init__(self, message: str = "", **kw) -> None:
+        super().__init__(message, fmt="image", **kw)
 
 
 class ImageParser:

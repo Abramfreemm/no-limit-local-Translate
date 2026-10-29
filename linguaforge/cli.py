@@ -16,6 +16,7 @@ from pathlib import Path
 
 from . import __version__
 from .core.config import Config
+from .core.problems import problems_to_text
 from .pipeline import Pipeline
 from .translate.ollama_client import OllamaClient
 
@@ -151,8 +152,8 @@ def cmd_translate(args: argparse.Namespace, cfg: Config) -> int:
     _print(res.summary())
     if res.stats and res.stats.degrade_events:
         _print(f"  降级事件: {', '.join(res.stats.degrade_events[:8])}")
-    for e in res.errors[:10]:
-        _print(f"  ! {e}")
+    for line in problems_to_text(res.errors[:10]):
+        _print(f"  ! {line}")
     return 0 if res.ok else 1
 
 

@@ -29,6 +29,7 @@ from docx.text.run import Run as DocxRun
 
 from ..core.config import Config
 from ..core.docir import Block, BlockState, BlockType, DocIR, Origin, Page, Run, Style
+from ..core.problems import DocumentParseError
 
 # 标题样式名：Heading 1 / heading1 / 标题 1 / Titre 1 / Überschrift 1
 _RE_HEADING_NAME = re.compile(r"^\s*(?:heading|标题|標題|titre|überschrift)\s*(\d{1,2})\s*$", re.I)
@@ -56,8 +57,16 @@ _ALIGN_MAP = {
 }
 
 
-class DocxParseError(RuntimeError):
-    """DOCX 解析失败（文件损坏、加密或不是合法 OOXML 包）。"""
+class DocxParseError(DocumentParseError):
+    """DOCX 解析失败。
+
+    ADR-016：原 6 个 ``*ParseError`` 除名字外完全一致却各自演化，
+    现统一继承 :class:`~linguaforge.core.problems.DocumentParseError`，
+    仅保留 ``fmt="docx"`` 作为格式标签，上层可一次捕获。
+    """
+
+    def __init__(self, message: str = "", **kw) -> None:
+        super().__init__(message, fmt="docx", **kw)
 
 
 class DocxParser:

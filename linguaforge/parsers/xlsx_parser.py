@@ -24,13 +24,22 @@ from openpyxl.utils import get_column_letter
 
 from ..core.config import Config
 from ..core.docir import Block, BlockState, BlockType, DocIR, Origin, Page, Style
+from ..core.problems import DocumentParseError
 
 # 超过此规模就先探测真实使用范围，避免遍历百万空行
 _SPARSE_CELL_BUDGET = 2_000_000
 
 
-class XlsxParseError(RuntimeError):
-    """XLSX 解析失败（文件损坏、不是工作簿或读取异常）。"""
+class XlsxParseError(DocumentParseError):
+    """XLSX 解析失败。
+
+    ADR-016：原 6 个 ``*ParseError`` 除名字外完全一致却各自演化，
+    现统一继承 :class:`~linguaforge.core.problems.DocumentParseError`，
+    仅保留 ``fmt="xlsx"`` 作为格式标签，上层可一次捕获。
+    """
+
+    def __init__(self, message: str = "", **kw) -> None:
+        super().__init__(message, fmt="xlsx", **kw)
 
 
 class XlsxParser:
