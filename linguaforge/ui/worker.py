@@ -21,7 +21,7 @@ import httpx
 from PySide6.QtCore import QThread, Signal
 
 from ..core.config import Config
-from ..core.problems import problems_to_text
+from ..core.problems import from_exception, problems_to_text
 from ..pipeline import OUT_EXT, SUPPORTED_IN, Pipeline, PipelineResult
 from ..translate.ollama_client import OllamaClient
 
@@ -235,7 +235,8 @@ class TranslateWorker(QThread):
             )
         except Exception as exc:  # noqa: BLE001
             self._fail += 1
-            self.sig_item_error.emit(row, f"{type(exc).__name__}: {exc}")
+            # 走统一文案层：业务异常给出人话，其余才退回异常名
+            self.sig_item_error.emit(row, "; ".join(problems_to_text([from_exception(exc)])))
             return
 
         if self.gate.canceled:

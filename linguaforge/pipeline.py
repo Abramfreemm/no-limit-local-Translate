@@ -31,7 +31,6 @@ from .ocr import RapidOCREngine
 from .parsers import PDFParser, TextParser
 from .parsers.render import PDFRenderer
 from .store import Store
-from .translate.ollama_client import OllamaClient
 from .translate.translator import TranslateStats, Translator
 from .writers.markdown import render_pages as render_markdown_pages
 from .writers.text import render_page_text
@@ -732,16 +731,16 @@ class Pipeline:
         return src.with_name(f"{src.stem}.translated{ext}")
 
     # ---------------- 连通性自检 ----------------
-    def precheck(self) -> list[str]:
-        """返回问题列表；空列表表示就绪。"""
-        problems: list[str] = []
-        try:
-            with OllamaClient(self.cfg.ollama.host, timeout=10) as c:
-                c.version()
-                if not c.has_model(self.cfg.ollama.model):
-                    problems.append(
-                        f"模型 {self.cfg.ollama.model} 未安装，请先执行: ollama pull {self.cfg.ollama.model}"
-                    )
-        except Exception as e:  # noqa: BLE001
-            problems.append(f"Ollama 不可用：{e}（请先启动 Ollama）")
+    def precheck(self) -> list[Problem]:
+        """开工前预检查。返回 :class:`Problem` 列表，空列表表示就绪。
+
+        只查环境与模型，**不查磁盘** —— 此时还不知道输出目录在哪，
+        磁盘与目录可写性由 `run(preflight=True)` 在具体输出路径已知时检查。
+
+        （注意：``OutputConfig`` 上没有 ``out_dir`` 字段，别在这里读它。）
+        """
+        from .core.preflight import check_ocr, check_ollama
+
+        problems, _ = check_ollama(self.cfg)
+        problems += check_ocr(self.cfg)
         return problems

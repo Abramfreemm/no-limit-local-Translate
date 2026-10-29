@@ -102,8 +102,8 @@ def cmd_translate(args: argparse.Namespace, cfg: Config) -> int:
 
     problems = p.precheck()
     if problems:
-        for s in problems:
-            _print(f"[FAIL] {s}")
+        for line in problems_to_text(problems):
+            _print(f"[FAIL] {line}")
         return 1
 
     if args.glossary:
