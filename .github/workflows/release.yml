@@ -195,11 +195,25 @@ jobs:
         with:
           path: artifacts
 
-      - name: 合并校验值并生成 Release
+      # 两个 job 各生成一份同名 SHA256SUMS.txt，直接按 glob 上传会互相覆盖：
+      # 用户最后只拿到其中一个平台的校验值，而且条目还带着 dist/ 目录前缀。
+      # 这里重新合成一份干净的清单，文件名不带路径。
+      - name: 合并校验值
+        run: |
+          cd artifacts
+          : > SHA256SUMS.txt
+          for f in $(find . -type f \( -name '*.exe' -o -name '*.dmg' \) | sort); do
+            (cd "$(dirname "$f")" && sha256sum "$(basename "$f")") >> SHA256SUMS.txt
+          done
+          echo "--- 合并后的校验清单 ---"
+          cat SHA256SUMS.txt
+          test "$(wc -l < SHA256SUMS.txt)" -ge 2 || { echo "校验条目不足 2 条，疑似漏产物"; exit 1; }
+
+      - name: 生成 Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
             artifacts/**/*.exe
             artifacts/**/*.dmg
-            artifacts/**/SHA256SUMS.txt
+            artifacts/SHA256SUMS.txt
           generate_release_notes: true
