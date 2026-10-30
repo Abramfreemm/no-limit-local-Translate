@@ -149,9 +149,17 @@ jobs:
           codesign --verify --deep --strict dist/LinguaForge.app || echo "::warning::ad-hoc 签名校验未通过（无开发者证书时正常）"
 
       - name: 冒烟验证
+        # 注意：不要在 CI 上直接执行 .app 主程序 —— 它是 GUI，Qt 事件循环
+        # 永远不会退出，步骤会一直挂到 workflow 超时（实测挂满 20+ 分钟被手动取消）。
+        # runner 无显示环境，这里只能做结构断言；真正"能不能打开"靠发行后人工验证。
         run: |
-          dist/LinguaForge.app/Contents/MacOS/LinguaForge --help || true
-          test -d dist/LinguaForge.app && echo "app bundle OK"
+          APP=dist/LinguaForge.app/Contents/MacOS/LinguaForge
+          test -f "$APP" || { echo "主程序缺失"; exit 1; }
+          test -d dist/LinguaForge.app/Contents/Resources || { echo "Resources 缺失"; exit 1; }
+          # 中文字体没打进包的话，翻出来的 PDF 会是空白方块，必须拦住
+          test -n "$(find dist/LinguaForge.app -name 'NotoSansSC-Regular.ttf' | head -1)" \
+            || { echo "中文字体未打进包"; exit 1; }
+          echo "smoke ok"
 
       - name: 制作 dmg
         run: |
