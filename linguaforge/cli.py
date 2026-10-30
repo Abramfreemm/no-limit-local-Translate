@@ -21,6 +21,29 @@ from .pipeline import Pipeline
 from .translate.ollama_client import OllamaClient
 
 
+def _fix_windows_console_encoding() -> None:
+    """让 CLI 输出对齐 Windows 控制台代码页，避免中文乱码。
+
+    Python 默认按 locale 编码写 stdout。当系统开启 UTF-8（代码页 65001）、
+    而终端仍按 GBK 解码时（PowerShell 5.1 捕获外部命令输出就是这种情况），
+    doctor 这类排障信息的中文会整片变乱码，用户会看不懂失败原因。
+    这里显式对齐到控制台输出代码页，cmd / PowerShell / 重定向三种场景都能正常显示。
+    """
+    if sys.platform != "win32":
+        return
+    try:
+        import ctypes
+
+        cp = ctypes.windll.kernel32.GetConsoleOutputCP()
+        if not cp:
+            return
+        enc = "utf-8" if cp == 65001 else f"cp{cp}"
+        for stream in (sys.stdout, sys.stderr):
+            stream.reconfigure(encoding=enc, errors="replace")
+    except Exception:  # noqa: BLE001  编码修复失败不应让 CLI 起不来
+        pass
+
+
 def _print(m: str) -> None:
     print(m, flush=True)
 
@@ -192,6 +215,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv=None) -> int:
+    _fix_windows_console_encoding()
     args = build_parser().parse_args(argv)
     cfg = Config.load()
     if args.cmd == "doctor":

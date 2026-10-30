@@ -72,7 +72,22 @@ jobs:
         shell: pwsh
         run: |
           choco install innosetup --no-progress -y
-          $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
+          # choco 装到 Program Files (x86)，用户级安装则在 LocalAppData。
+          # 硬编码单一路径时，只要 choco 换版本或改安装方式，整条发布会直接断，
+          # 所以这里遍历候选路径，找不到再全盘兜底搜索。
+          $candidates = @(
+            "C:\Program Files (x86)\Inno Setup 6\ISCC.exe",
+            "C:\Program Files\Inno Setup 6\ISCC.exe",
+            "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe"
+          )
+          $iscc = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $iscc) {
+            $found = Get-ChildItem -Path "C:\ProgramData\chocolatey","$env:LOCALAPPDATA","C:\Program Files (x86)" `
+              -Filter ISCC.exe -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($found) { $iscc = $found.FullName }
+          }
+          if (-not $iscc) { Write-Error "未找到 ISCC.exe"; exit 1 }
+          Write-Host "使用 ISCC: $iscc"
           & $iscc "packaging\win\inno_setup.iss"
 
       - name: 收集产物并计算校验值

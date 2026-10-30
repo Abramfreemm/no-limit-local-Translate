@@ -119,26 +119,10 @@ Filename: "{app}\{#MyAppExeName}"; Description: "启动 {#MyAppName} / Launch"; 
 Type: filesandordirs; Name: "{app}"
 
 [Code]
-var
-  DataPage: TInputOptionWizardPage;
-
-function VCRedistNeedsInstall: Boolean;
-begin
-  Result := not RegKeyExists(HKEY_LOCAL_MACHINE,
-    'SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64');
-end;
-
-procedure InitializeWizard;
-begin
-  DataPage := CreateInputOptionPage(wpSelectTasks,
-    '数据清理 / Data cleanup',
-    '卸载时是否保留你的数据？',
-    '保留：术语表、翻译记忆、任务记录（位于 %LOCALAPPDATA%\LinguaForge）。删除：连同应用数据一并清除。',
-    True, False);
-  DataPage.Add('保留应用数据（推荐）');
-  DataPage.Add('删除应用数据');
-end;
-
+// 注意：[Code] 段是 Pascal，注释必须用 // 或 { }，不能沿用脚本段的 ;
+// 数据去留只在卸载时询问一次。
+// 旧版在安装向导里放过"数据清理"勾选项，但它的值从未被读取或保存，
+// 用户勾了也不生效、卸载时又再问一遍 —— 属于承诺了却做不到，故删除。
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 var
   DataDir: String;
